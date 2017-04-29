@@ -35,7 +35,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 
 
 ### Options
-- -config - config file (json)
+- -config - config file (json); default _config.json_
 
 
 ### Configuration file
