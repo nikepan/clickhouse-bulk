@@ -1,0 +1,12 @@
+{
+  "listen": ":8124",
+  "flush_count": 10000,
+  "flush_interval": 1000,
+  "debug": false,
+  "clickhouse": {
+    "down_timeout": 300,
+    "servers": [
+      "http://127.0.0.1:8123"
+    ]
+  }
+}
