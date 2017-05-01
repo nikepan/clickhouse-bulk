@@ -38,9 +38,9 @@ func (server *Server) writeHandler(c echo.Context) error {
 	user, password, ok := c.Request().BasicAuth()
 	if ok {
 		if qs == "" {
-			qs = "user="+user+"&password="+password
+			qs = "user=" + user + "&password=" + password
 		} else {
-			qs = "user="+user+"&password="+password + "&" + qs
+			qs = "user=" + user + "&password=" + password + "&" + qs
 		}
 	}
 	params, content, insert := server.Collector.ParseQuery(qs, s)

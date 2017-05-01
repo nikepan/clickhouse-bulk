@@ -146,15 +146,15 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 		var q string
 		eoq := strings.Index(queryString[i+6:], "&")
 		if eoq >= 0 {
-			q = queryString[i+6:eoq]
-			params = queryString[:i]+queryString[eoq:]
+			q = queryString[i+6 : eoq]
+			params = queryString[:i] + queryString[eoq:]
 		} else {
 			q = queryString[i+6:]
 			params = queryString[:i]
 		}
 		uq, err := url.QueryUnescape(q)
 		if body != "" {
-			uq += " "+body
+			uq += " " + body
 		}
 		if err != nil {
 			return queryString, body, false

@@ -24,6 +24,7 @@ go build
 - Supports many servers to send
 - Supports query in query parameters and in body
 - Supports other query parameters like username, password, database
+- Supports basic authentication
  
 
 For example:

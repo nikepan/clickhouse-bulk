@@ -19,6 +19,8 @@ Features
 
 - Supports other query parameters like username, password, database
 
+- - Supports basic authentication
+
 
 For example:
 
