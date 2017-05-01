@@ -23,6 +23,10 @@ func TestRunServer(t *testing.T) {
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
+	status, resp = authRequest("POST", "default", "", "/?query="+escTitle, qContent, e)
+	assert.Equal(t, status, http.StatusOK)
+	assert.Equal(t, resp, "")
+
 	e.GET("/status", server.statusHandler)
 	status, resp = request("GET", "/status", "", e)
 	assert.Equal(t, status, http.StatusOK)
@@ -33,6 +37,14 @@ func TestRunServer(t *testing.T) {
 
 func request(method, path string, body string, e *echo.Echo) (int, string) {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec.Code, rec.Body.String()
+}
+
+func authRequest(method, user string, password string, path string, body string, e *echo.Echo) (int, string) {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.SetBasicAuth(user, password)
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.String()

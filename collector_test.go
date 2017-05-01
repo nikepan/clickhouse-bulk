@@ -50,57 +50,63 @@ func TestCollector_ParseQuery(t *testing.T) {
 
 	params, content, insert = c.ParseQuery("", qTitle+" "+qContent)
 
-	assert.Equal(t, params, "query="+escTitle)
-	assert.Equal(t, content, qContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, "query="+escTitle, params)
+	assert.Equal(t, qContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery(qParams, qTitle+" "+qContent)
 
-	assert.Equal(t, params, qParams+"&query="+escTitle)
-	assert.Equal(t, content, qContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, qParams+"&query="+escTitle, params)
+	assert.Equal(t, qContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery("query="+escTitle, qContent)
 
-	assert.Equal(t, params, "query="+escTitle)
-	assert.Equal(t, content, qContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, "query="+escTitle, params)
+	assert.Equal(t, qContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery(qParams+"&query="+escTitle, qContent)
 
-	assert.Equal(t, params, qParams+"&query="+escTitle)
-	assert.Equal(t, content, qContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, qParams+"&query="+escTitle, params)
+	assert.Equal(t, qContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery("query="+escSelect, "")
 
-	assert.Equal(t, params, "query="+escSelect)
-	assert.Equal(t, content, "")
-	assert.Equal(t, insert, false)
+	assert.Equal(t, "query="+escSelect, params)
+	assert.Equal(t, "", content)
+	assert.Equal(t, false, insert)
+
+	params, content, insert = c.ParseQuery("query="+url.QueryEscape(qValuesTitle+" "+qValuesContent), "")
+
+	assert.Equal(t, "query="+url.QueryEscape(qValuesTitle), params)
+	assert.Equal(t, qValuesContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery("", qSelect)
 
-	assert.Equal(t, params, "query="+escSelect)
-	assert.Equal(t, content, "")
-	assert.Equal(t, insert, false)
+	assert.Equal(t, "query="+escSelect, params)
+	assert.Equal(t, "", content)
+	assert.Equal(t, false, insert)
 
 	params, content, insert = c.ParseQuery("", strings.ToLower(qTitle)+" "+qContent)
 
-	assert.Equal(t, strings.ToLower(params), "query="+strings.ToLower(escTitle))
-	assert.Equal(t, content, qContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, "query="+strings.ToLower(escTitle), strings.ToLower(params))
+	assert.Equal(t, qContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery("", strings.ToLower(qValuesTitle)+" "+qValuesContent)
 
-	assert.Equal(t, strings.ToLower(params), "query="+strings.ToLower(url.QueryEscape(qValuesTitle)))
-	assert.Equal(t, content, qValuesContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, "query="+strings.ToLower(url.QueryEscape(qValuesTitle)), strings.ToLower(params))
+	assert.Equal(t, qValuesContent, content)
+	assert.Equal(t, true, insert)
 
 	params, content, insert = c.ParseQuery("", qValuesTitleUpper+" "+qValuesContent)
 
-	assert.Equal(t, strings.ToLower(params), "query="+strings.ToLower(url.QueryEscape(qValuesTitleUpper)))
-	assert.Equal(t, content, qValuesContent)
-	assert.Equal(t, insert, true)
+	assert.Equal(t, "query="+strings.ToLower(url.QueryEscape(qValuesTitleUpper)), strings.ToLower(params))
+	assert.Equal(t, qValuesContent, content)
+	assert.Equal(t, true, insert)
 }
 
 func TestTable_CheckFlush(t *testing.T) {

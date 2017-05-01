@@ -15,6 +15,10 @@ Features
 
 - Supports many servers to send
 
+- Supports query in query parameters and in body
+
+- Supports other query parameters like username, password, database
+
 
 For example:
 

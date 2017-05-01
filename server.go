@@ -34,7 +34,16 @@ func (server *Server) writeHandler(c echo.Context) error {
 		log.Printf("query %+v %+v\n", c.QueryString(), s)
 	}
 
-	params, content, insert := server.Collector.ParseQuery(c.QueryString(), s)
+	qs := c.QueryString()
+	user, password, ok := c.Request().BasicAuth()
+	if ok {
+		if qs == "" {
+			qs = "user="+user+"&password="+password
+		} else {
+			qs = "user="+user+"&password="+password + "&" + qs
+		}
+	}
+	params, content, insert := server.Collector.ParseQuery(qs, s)
 	if insert {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")

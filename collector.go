@@ -143,8 +143,29 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 		if HasPrefix(queryString[i+6:], "insert") {
 			insert = true
 		}
-		params = queryString
-		content = body
+		var q string
+		eoq := strings.Index(queryString[i+6:], "&")
+		if eoq >= 0 {
+			q = queryString[i+6:eoq]
+			params = queryString[:i]+queryString[eoq:]
+		} else {
+			q = queryString[i+6:]
+			params = queryString[:i]
+		}
+		uq, err := url.QueryUnescape(q)
+		if body != "" {
+			uq += " "+body
+		}
+		if err != nil {
+			return queryString, body, false
+		}
+		prefix, cnt := c.Parse(uq)
+		if strings.HasSuffix(params, "&") || params == "" {
+			params += "query=" + url.QueryEscape(strings.TrimSpace(prefix))
+		} else {
+			params += "&query=" + url.QueryEscape(strings.TrimSpace(prefix))
+		}
+		content = cnt
 	} else {
 		var q string
 		q, content = c.Parse(body)
