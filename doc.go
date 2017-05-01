@@ -1,4 +1,5 @@
 /*
+
 ClickHouse-Bulk
 
 Simple Yandex ClickHouse (https://clickhouse.yandex/) insert collector. It collect requests and send to ClickHouse servers.
@@ -7,8 +8,11 @@ Simple Yandex ClickHouse (https://clickhouse.yandex/) insert collector. It colle
 Features
 
 - Group n requests and send to any of ClickHouse server
+
 - Sending collected data by interval
+
 - Tested with VALUES, TabSeparated formats
+
 - Supports many servers to send
 
 
