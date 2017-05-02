@@ -8,13 +8,18 @@
 Simple [Yandex ClickHouse](https://clickhouse.yandex/) insert collector. It collect requests and send to ClickHouse servers.
 
 
-### Installation from sources:
+### Installation
+
+From sources:
+
 ```text
 git clone github.com/nikepan/clickhouse-bulk
 cd clickhouse-bulk
 go get
 go build
 ```
+
+You can download linux-64 binary [clickhouse-bulk-linux_64.tgz](https://www.dropbox.com/s/e99urgy3sx71f41/clickhouse-bulk-linux_64.tgz?dl=0)
 
 
 ### Features
@@ -43,7 +48,8 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 
 
 ### Configuration file
-```json{
+```json
+{
   "listen": ":8124", 
   "flush_count": 10000, // check by \n char
   "flush_interval": 1000, // milliseconds
