@@ -77,17 +77,6 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 
 }
 
-// Send - send request to next server
-func (c *Clickhouse) Send(queryString string, data string) {
-	req := ClickhouseRequest{queryString, data}
-	c.Queue.Put(req)
-}
-
-// Dump - save query to file
-func (c *Clickhouse) Dump(params string, data string) {
-
-}
-
 // Run server
 func (c *Clickhouse) Run() {
 	var err error
@@ -99,7 +88,7 @@ func (c *Clickhouse) Run() {
 			resp, status := c.SendQuery(data.Params, data.Content)
 			if status != http.StatusOK {
 				log.Printf("Send ERROR %+v: %+v\n", status, resp)
-				c.Dump(data.Params, data.Content)
+				Dump(data.Params, data.Content)
 			}
 		}
 	}

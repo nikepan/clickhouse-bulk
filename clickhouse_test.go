@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
-	"time"
 )
 
 func TestClickhouse_GetNextServer(t *testing.T) {
@@ -23,15 +22,6 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, status)
 	assert.Equal(t, true, s.Bad)
 	c.SendQuery("", "")
-}
-
-func TestClickhouse_Send(t *testing.T) {
-	c := NewClickhouse(300)
-	c.AddServer("")
-	c.Send("", "")
-	for !c.Queue.Empty() {
-		time.Sleep(10)
-	}
 }
 
 func TestClickhouse_SendQuery(t *testing.T) {

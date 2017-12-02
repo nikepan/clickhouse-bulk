@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -59,7 +61,11 @@ func (t *Table) Content() string {
 // Flush - sends collcted data in table to clickhouse
 func (t *Table) Flush() {
 	rows := t.Content()
-	t.Sender.Send(t.Name, rows)
+	resp, status := t.Sender.SendQuery(t.Name, rows)
+	if status != http.StatusOK {
+		log.Printf("Flush ERROR %+v: %+v\n", status, resp)
+		Dump(t.Name, rows)
+	}
 	t.Rows = make([]string, 0, t.FlushCount)
 	t.Count = 0
 }
