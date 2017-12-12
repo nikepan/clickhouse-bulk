@@ -3,6 +3,7 @@
   "flush_count": 10000,
   "flush_interval": 1000,
   "debug": false,
+  "dump_dir": "dumps",
   "clickhouse": {
     "down_timeout": 300,
     "servers": [

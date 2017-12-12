@@ -24,6 +24,8 @@ type Clickhouse struct {
 	Queue       *queue.Queue
 	mu          sync.Mutex
 	DownTimeout int
+	Dumper      Dumper
+	wg          sync.WaitGroup
 }
 
 // ClickhouseRequest - request struct for queue
@@ -80,12 +82,26 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 // Send - send request to next server
 func (c *Clickhouse) Send(queryString string, data string) {
 	req := ClickhouseRequest{queryString, data}
+	c.wg.Add(1)
 	c.Queue.Put(req)
 }
 
 // Dump - save query to file
-func (c *Clickhouse) Dump(params string, data string) {
+func (c *Clickhouse) Dump(params string, data string) error {
+	if c.Dumper != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.Dumper.Dump(params, data)
+	}
+	return nil
+}
 
+func (c *Clickhouse) Len() int64 {
+	return c.Queue.Len()
+}
+
+func (c *Clickhouse) Empty() bool {
+	return c.Queue.Empty()
 }
 
 // Run server
@@ -101,8 +117,15 @@ func (c *Clickhouse) Run() {
 				log.Printf("Send ERROR %+v: %+v\n", status, resp)
 				c.Dump(data.Params, data.Content)
 			}
+			c.wg.Done()
 		}
 	}
+}
+
+// WaitFlush - wait for flush ends
+func (c *Clickhouse) WaitFlush() (err error) {
+	c.wg.Wait()
+	return nil
 }
 
 // SendQuery - sends query to server and return result
@@ -135,6 +158,7 @@ func (c *Clickhouse) SendQuery(queryString string, data string) (response string
 			}
 			return r, status
 		} else {
+			c.Dump(queryString, data)
 			return "No working clickhouse servers", http.StatusBadGateway
 		}
 	}

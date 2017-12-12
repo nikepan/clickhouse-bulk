@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"github.com/labstack/echo"
 	"io/ioutil"
 	"log"
@@ -12,6 +13,7 @@ type Server struct {
 	Listen    string
 	Collector *Collector
 	Debug     bool
+	echo      *echo.Echo
 }
 
 type Status struct {
@@ -23,7 +25,7 @@ type Status struct {
 
 // NewServer - create server
 func NewServer(listen string, collector *Collector, debug bool) *Server {
-	return &Server{listen, collector, debug}
+	return &Server{listen, collector, debug, echo.New()}
 }
 
 func (server *Server) writeHandler(c echo.Context) error {
@@ -57,12 +59,19 @@ func (server *Server) statusHandler(c echo.Context) error {
 	return c.JSON(200, Status{Status: "ok"})
 }
 
-// RunServer - run server
-func RunServer(listen string, collector *Collector, debug bool) error {
-	server := NewServer(listen, collector, debug)
-	e := echo.New()
-	e.POST("/", server.writeHandler)
-	e.GET("/status", server.statusHandler)
+func (server *Server) Start() error {
+	return server.echo.Start(server.Listen)
+}
 
-	return e.Start(server.Listen)
+func (server *Server) Shutdown(ctx context.Context) error {
+	return server.echo.Shutdown(ctx)
+}
+
+// RunServer - run server
+func InitServer(listen string, collector *Collector, debug bool) *Server {
+	server := NewServer(listen, collector, debug)
+	server.echo.POST("/", server.writeHandler)
+	server.echo.GET("/status", server.statusHandler)
+
+	return server
 }

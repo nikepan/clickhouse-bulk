@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -19,7 +20,21 @@ type config struct {
 	Clickhouse    clickhouseConfig `json:"clickhouse"`
 	FlushCount    int              `json:"flush_count"`
 	FlushInterval int              `json:"flush_interval"`
+	DumpDir       string           `json:"dump_dir"`
 	Debug         bool             `json:"debug"`
+}
+
+func safeQuit(collect *Collector, sender Sender) {
+	collect.FlushAll()
+	if count := sender.Len(); count > 0 {
+		log.Printf("Sending %+v tables\n", count)
+	}
+	for !sender.Empty() && !collect.Empty() {
+		collect.WaitFlush()
+	}
+	collect.WaitFlush()
+
+	os.Exit(1)
 }
 
 func main() {
@@ -32,14 +47,17 @@ func main() {
 	cnf := config{}
 	err := ReadJSON(*configFile, &cnf)
 	if err != nil {
-		log.Printf("Config file %+v not found. Use config.sample.json", *configFile)
+		log.Printf("Config file %+v not found. Use config.sample.json\n", *configFile)
 		err := ReadJSON("config.sample.json", &cnf)
 		if err != nil {
 			log.Fatalf("Read config: %+v\n", err.Error())
 		}
 	}
 
+	dumper := new(FileDumper)
+	dumper.Path = cnf.DumpDir
 	sender := NewClickhouse(cnf.Clickhouse.DownTimeout)
+	sender.Dumper = dumper
 	for _, url := range cnf.Clickhouse.Servers {
 		sender.AddServer(url)
 	}
@@ -50,23 +68,24 @@ func main() {
 	signals := make(chan os.Signal)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
+	srv := InitServer(cnf.Listen, collect, cnf.Debug)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	go func() {
 		for {
 			_ = <-signals
-			log.Printf("STOP signal")
-			collect.FlushAll()
-			if count := sender.Queue.Len(); count > 0 {
-				log.Printf("Sending %+v tables", count)
+			log.Printf("STOP signal\n")
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Printf("Shutdown error %+v\n", err)
+				safeQuit(collect, sender)
 			}
-			for !sender.Queue.Empty() {
-				time.Sleep(10)
-			}
-			os.Exit(1)
 		}
 	}()
 
-	err = RunServer(cnf.Listen, collect, cnf.Debug)
+	err = srv.Start()
 	if err != nil {
-		log.Fatal("ListenAndServe:", err)
+		log.Printf("ListenAndServe: %+v\n", err)
+		safeQuit(collect, sender)
 	}
 }

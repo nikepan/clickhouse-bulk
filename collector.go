@@ -75,6 +75,7 @@ func (t *Table) CheckFlush() bool {
 	return false
 }
 
+// Empty - Checks if table is empty
 func (t *Table) Empty() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -103,6 +104,18 @@ func (t *Table) Add(text string) {
 	}
 }
 
+// Empty - check if all tables are empty
+func (c *Collector) Empty() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, t := range c.Tables {
+		if ok := t.Empty(); !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // FlushAll - flush all tables to clickhouse
 func (c *Collector) FlushAll() (count int) {
 	c.mu.Lock()
@@ -115,6 +128,11 @@ func (c *Collector) FlushAll() (count int) {
 
 	}
 	return count
+}
+
+// WaitFlush - wait for flush all tables
+func (c *Collector) WaitFlush() (err error) {
+	return c.Sender.WaitFlush()
 }
 
 // AddTable - adding table to collector
