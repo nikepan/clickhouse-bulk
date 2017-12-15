@@ -48,7 +48,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 
 
 ### Configuration file
-```json
+```javascript
 {
   "listen": ":8124", 
   "flush_count": 10000, // check by \n char
