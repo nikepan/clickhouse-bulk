@@ -19,8 +19,7 @@ go get
 go build
 ```
 
-You can downlad binaries in [releases]
-(https://github.com/nikepan/clickhouse-bulk/releases)
+You can downlad binaries in [releases](https://github.com/nikepan/clickhouse-bulk/releases)
 
 
 ### Features
