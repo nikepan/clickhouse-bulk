@@ -11,7 +11,9 @@ Simple [Yandex ClickHouse](https://clickhouse.yandex/) insert collector. It coll
 
 ### Installation
 
-From sources (Go 1.8+):
+[Download binary](https://github.com/nikepan/clickhouse-bulk/releases) for you platorm
+
+or from sources (Go 1.8+):
 
 ```text
 git clone github.com/nikepan/clickhouse-bulk
