@@ -225,8 +225,8 @@ func (c *Collector) Parse(text string) (prefix string, content string) {
 			i = strings.Index(text, "values")
 		}
 		if i >= 0 {
-			prefix = text[:i+6]
-			content = text[i+6:]
+			prefix = strings.TrimSpace(text[:i+6])
+			content = strings.TrimSpace(text[i+6:])
 		} else {
 			off := regexFormat.FindStringSubmatchIndex(text)
 			if len(off) > 3 {
