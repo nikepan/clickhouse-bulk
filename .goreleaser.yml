@@ -1,0 +1,30 @@
+---
+project_name: clickhouse-bulk
+
+release:
+  github:
+    owner: nikepan
+    name: clickhouse-bulk
+
+builds:
+  - binary: clickhouse-bulk
+    goos: &goos
+      - darwin
+      - windows
+      - linux
+    goarch: &goarch
+      - amd64
+      - i386
+    env:
+      - CGO_ENABLED=0
+    main: ./
+    ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archive:
+  format_overrides:
+    - goos: windows
+      format: zip
+  files:
+    - config.sample.json
+    - README.md
+    - LICENSE

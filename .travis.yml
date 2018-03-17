@@ -1,7 +1,8 @@
 language: go
 sudo: false
 go:
-  - 1.8.1
+  - 1.9.3
+  - "1.10"
   - tip
 
 script:
@@ -9,3 +10,19 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+
+before_deploy:
+  - curl -sL https://git.io/goreleaser | bash
+deploy:
+  provider: releases
+  api_key: $GITHUB_TOKEN
+  file_glob: true
+  file:
+    - dist/clickhouse-bulk-*.zip
+    - dist/clickhouse-bulk-*.tar.bz2
+    - dist/clickhouse-bulk-*.sha256
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: nikepan/clickhouse-bulk
+    condition: $TRAVIS_GO_VERSION =~ ^1\.9\.[0-9]+$

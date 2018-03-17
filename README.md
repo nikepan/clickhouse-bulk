@@ -19,7 +19,8 @@ go get
 go build
 ```
 
-You can download linux-64 binary [clickhouse-bulk-linux_64.tgz](https://www.dropbox.com/s/e99urgy3sx71f41/clickhouse-bulk-linux_64.tgz?dl=0)
+You can downlad binaries in [releases]
+(https://github.com/nikepan/clickhouse-bulk/releases)
 
 
 ### Features
