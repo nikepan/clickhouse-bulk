@@ -20,8 +20,6 @@ go get
 go build
 ```
 
-You can downlad binaries in [releases](https://github.com/nikepan/clickhouse-bulk/releases)
-
 
 ### Features
 - Group n requests and send to any of ClickHouse server
