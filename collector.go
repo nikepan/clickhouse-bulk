@@ -207,10 +207,10 @@ func (c *Collector) Parse(text string) (prefix string, content string) {
 		w := false
 		off := -1
 		for c := i + 7; c < len(text); c++ {
-			if !w && text[c] != ' ' && text[c] != '\n' {
+			if !w && text[c] != ' ' && text[c] != '\n' && text[c] != ';' {
 				w = true
 			}
-			if w && (text[c] == ' ' || text[c] == '\n') {
+			if w && (text[c] == ' ' || text[c] == '\n' || text[c] == ';') {
 				off = c + 1
 				break
 			}
@@ -221,9 +221,12 @@ func (c *Collector) Parse(text string) (prefix string, content string) {
 		}
 	} else {
 		i = strings.Index(text, "VALUES")
+		if i == -1 {
+			i = strings.Index(text, "values")
+		}
 		if i >= 0 {
-			prefix = text[:i+6]
-			content = text[i+7:]
+			prefix = strings.TrimSpace(text[:i+6])
+			content = strings.TrimSpace(text[i+6:])
 		} else {
 			off := regexFormat.FindStringSubmatchIndex(text)
 			if len(off) > 3 {
