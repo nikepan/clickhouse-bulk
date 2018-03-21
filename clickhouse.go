@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/nikepan/go-datastructures/queue"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nikepan/go-datastructures/queue"
 )
 
 // ClickhouseServer - clickhouse server instance object struct
@@ -96,10 +97,12 @@ func (c *Clickhouse) Dump(params string, data string) error {
 	return nil
 }
 
+// Len - returns queries queue length
 func (c *Clickhouse) Len() int64 {
 	return c.Queue.Len()
 }
 
+// Empty - check if queue is empty
 func (c *Clickhouse) Empty() bool {
 	return c.Queue.Empty()
 }
@@ -157,9 +160,8 @@ func (c *Clickhouse) SendQuery(queryString string, data string) (response string
 				continue
 			}
 			return r, status
-		} else {
-			c.Dump(queryString, data)
-			return "No working clickhouse servers", http.StatusBadGateway
 		}
+		c.Dump(queryString, data)
+		return "No working clickhouse servers", http.StatusBadGateway
 	}
 }

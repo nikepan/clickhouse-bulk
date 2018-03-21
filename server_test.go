@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/labstack/echo"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/labstack/echo"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRunServer(t *testing.T) {
@@ -28,7 +29,7 @@ func TestRunServer(t *testing.T) {
 	assert.Equal(t, resp, "")
 
 	e.GET("/status", server.statusHandler)
-	status, resp = request("GET", "/status", "", e)
+	status, _ = request("GET", "/status", "", e)
 	assert.Equal(t, status, http.StatusOK)
 
 	go main()

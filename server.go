@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/labstack/echo"
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/labstack/echo"
 )
 
 // Server - main server object
@@ -16,6 +17,7 @@ type Server struct {
 	echo      *echo.Echo
 }
 
+// Status - response status struct
 type Status struct {
 	Status    string                       `json:"status"`
 	SendQueue int                          `json:"send_queue,omitempty"`
@@ -49,25 +51,26 @@ func (server *Server) writeHandler(c echo.Context) error {
 	if insert {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
-	} else {
-		resp, status := server.Collector.Sender.SendQuery(params, content)
-		return c.String(status, resp)
 	}
+	resp, status := server.Collector.Sender.SendQuery(params, content)
+	return c.String(status, resp)
 }
 
 func (server *Server) statusHandler(c echo.Context) error {
 	return c.JSON(200, Status{Status: "ok"})
 }
 
+// Start - start http server
 func (server *Server) Start() error {
 	return server.echo.Start(server.Listen)
 }
 
+// Shutdown - stop http server
 func (server *Server) Shutdown(ctx context.Context) error {
 	return server.echo.Shutdown(ctx)
 }
 
-// RunServer - run server
+// InitServer - run server
 func InitServer(listen string, collector *Collector, debug bool) *Server {
 	server := NewServer(listen, collector, debug)
 	server.echo.POST("/", server.writeHandler)

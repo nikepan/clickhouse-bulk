@@ -64,7 +64,7 @@ func (t *Table) Flush() {
 	t.Count = 0
 }
 
-// CheckFluch - check if flush is need and sends data to clickhouse
+// CheckFlush - check if flush is need and sends data to clickhouse
 func (t *Table) CheckFlush() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()

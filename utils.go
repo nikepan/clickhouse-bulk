@@ -25,15 +25,18 @@ func HasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.ToLower(s[0:len(prefix)]) == strings.ToLower(prefix)
 }
 
+// Dumper - interface for dump data
 type Dumper interface {
 	Dump(params string, data string) error
 }
 
+// FileDumper - dumps data to file system
 type FileDumper struct {
 	Path    string
 	DumpNum int
 }
 
+// Dump - dumps data to files
 func (d *FileDumper) Dump(params string, data string) error {
 	if _, err := os.Stat(d.Path); os.IsNotExist(err) {
 		os.Mkdir(d.Path, 644)

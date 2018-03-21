@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+var version = "unknown"
+var date = "unknown"
+
 type clickhouseConfig struct {
 	Servers     []string `json:"servers"`
 	DownTimeout int      `json:"down_timeout"`
@@ -44,6 +47,12 @@ func main() {
 	configFile := flag.String("config", "config.json", "config file (json)")
 
 	flag.Parse()
+
+	if flag.Arg(0) == "version" {
+		log.Printf("clickhouse-bulk ver. %+v (%+v)\n", version, date)
+		return
+	}
+
 	cnf := config{}
 	err := ReadJSON(*configFile, &cnf)
 	if err != nil {
