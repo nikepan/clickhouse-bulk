@@ -164,8 +164,8 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 		var q string
 		eoq := strings.Index(queryString[i+6:], "&")
 		if eoq >= 0 {
-			q = queryString[i+6 : eoq]
-			params = queryString[:i] + queryString[eoq:]
+			q = queryString[i+6 : eoq+6]
+			params = queryString[:i] + queryString[eoq+7:]
 		} else {
 			q = queryString[i+6:]
 			params = queryString[:i]

@@ -27,7 +27,8 @@ type config struct {
 	Debug         bool             `json:"debug"`
 }
 
-func safeQuit(collect *Collector, sender Sender) {
+// SafeQuit - safe prepare to quit
+func SafeQuit(collect *Collector, sender Sender) {
 	collect.FlushAll()
 	if count := sender.Len(); count > 0 {
 		log.Printf("Sending %+v tables\n", count)
@@ -36,8 +37,6 @@ func safeQuit(collect *Collector, sender Sender) {
 		collect.WaitFlush()
 	}
 	collect.WaitFlush()
-
-	os.Exit(1)
 }
 
 func main() {
@@ -87,7 +86,8 @@ func main() {
 			log.Printf("STOP signal\n")
 			if err := srv.Shutdown(ctx); err != nil {
 				log.Printf("Shutdown error %+v\n", err)
-				safeQuit(collect, sender)
+				SafeQuit(collect, sender)
+				os.Exit(1)
 			}
 		}
 	}()
@@ -95,6 +95,7 @@ func main() {
 	err = srv.Start()
 	if err != nil {
 		log.Printf("ListenAndServe: %+v\n", err)
-		safeQuit(collect, sender)
+		SafeQuit(collect, sender)
+		os.Exit(1)
 	}
 }

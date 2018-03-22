@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
+	"github.com/labstack/echo"
 	"io/ioutil"
 	"log"
 	"net/http"
-
-	"github.com/labstack/echo"
 )
 
 // Server - main server object

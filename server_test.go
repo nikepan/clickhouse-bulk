@@ -1,14 +1,13 @@
 package main
 
 import (
+	"github.com/labstack/echo"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/labstack/echo"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRunServer(t *testing.T) {
@@ -16,7 +15,12 @@ func TestRunServer(t *testing.T) {
 	server := NewServer("", collector, false)
 	e := echo.New()
 	e.POST("/", server.writeHandler)
-	status, resp := request("POST", "/?query="+escSelect, "", e)
+
+	status, resp := request("POST", "/", "", e)
+	assert.Equal(t, status, http.StatusOK)
+	assert.Equal(t, resp, "")
+
+	status, resp = request("POST", "/?query="+escSelect, "", e)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
@@ -25,6 +29,10 @@ func TestRunServer(t *testing.T) {
 	assert.Equal(t, resp, "")
 
 	status, resp = authRequest("POST", "default", "", "/?query="+escTitle, qContent, e)
+	assert.Equal(t, status, http.StatusOK)
+	assert.Equal(t, resp, "")
+
+	status, resp = authRequest("POST", "default", "", "/", "", e)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 

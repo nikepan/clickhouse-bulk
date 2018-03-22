@@ -2,7 +2,9 @@ package main
 
 import (
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 )
@@ -50,4 +52,17 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 	c.Servers[0].Bad = true
 	s := c.GetNextServer()
 	assert.Equal(t, false, s.Bad)
+}
+
+func TestClickhouse_Dump(t *testing.T) {
+	const dumpName = "dump1.dmp"
+	c := NewClickhouse(-1)
+	c.Dumper = new(FileDumper)
+	c.AddServer("")
+	c.Dump("eee", "eee")
+	assert.True(t, c.Empty())
+	buf, err := ioutil.ReadFile(dumpName)
+	assert.Nil(t, err)
+	assert.Equal(t, "eee\neee", string(buf))
+	os.Remove(dumpName)
 }

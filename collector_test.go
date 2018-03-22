@@ -15,9 +15,12 @@ const qValuesTitleUpper = "INSERT INTO table3 (c1, c2, c3) VALUES"
 const qValuesContent = "(v11,v12,v13),(v21,v22,v23)"
 const qSelect = "SELECT 1"
 const qParams = "user=user&password=111"
+const qSelectAndParams = "query=" + qSelect + "&" + qParams
+const badEscQuery = "query=INSERT %zdwfr"
 
 var escTitle = url.QueryEscape(qTitle)
 var escSelect = url.QueryEscape(qSelect)
+var escParamsAndSelect = qParams + "&query=" + escSelect
 
 func BenchmarkCollector_Push(t *testing.B) {
 	c := NewCollector(&fakeSender{}, 1000, 1000)
@@ -78,6 +81,11 @@ func TestCollector_ParseQuery(t *testing.T) {
 	assert.Equal(t, "", content)
 	assert.Equal(t, false, insert)
 
+	params, content, insert = c.ParseQuery(qSelectAndParams, "")
+	assert.Equal(t, escParamsAndSelect, params)
+	assert.Equal(t, "", content)
+	assert.Equal(t, false, insert)
+
 	params, content, insert = c.ParseQuery("query="+url.QueryEscape(qValuesTitle+" "+qValuesContent), "")
 
 	assert.Equal(t, "query="+url.QueryEscape(qValuesTitle), params)
@@ -107,6 +115,10 @@ func TestCollector_ParseQuery(t *testing.T) {
 	assert.Equal(t, "query="+strings.ToLower(url.QueryEscape(qValuesTitleUpper)), strings.ToLower(params))
 	assert.Equal(t, qValuesContent, content)
 	assert.Equal(t, true, insert)
+
+	params, content, insert = c.ParseQuery(badEscQuery, qValuesTitleUpper+" "+qValuesContent)
+
+	assert.False(t, insert)
 }
 
 func TestTable_CheckFlush(t *testing.T) {
