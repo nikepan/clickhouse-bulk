@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -59,6 +61,26 @@ func main() {
 		err := ReadJSON("config.sample.json", &cnf)
 		if err != nil {
 			log.Fatalf("Read config: %+v\n", err.Error())
+		}
+	}
+
+	serversList := os.Getenv("CLICKHOUSE_SERVERS")
+	if serversList != "" {
+		cnf.Clickhouse.Servers = strings.Split(serversList, ",")
+		log.Printf("use servers: %+v\n", serversList)
+	}
+	flushCount := os.Getenv("CLICKHOUSE_FLUSH_COUNT")
+	if flushCount != "" {
+		cnf.FlushCount, err = strconv.Atoi(flushCount)
+		if err != nil {
+			log.Fatalf("Wrong flush count env: %+v\n", err.Error())
+		}
+	}
+	flushInterval := os.Getenv("CLICKHOUSE_FLUSH_INTERVAL")
+	if flushInterval != "" {
+		cnf.FlushInterval, err = strconv.Atoi(flushInterval)
+		if err != nil {
+			log.Fatalf("Wrong flush interval env: %+v\n", err.Error())
 		}
 	}
 

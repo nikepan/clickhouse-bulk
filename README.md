@@ -13,6 +13,11 @@ Simple [Yandex ClickHouse](https://clickhouse.yandex/) insert collector. It coll
 
 [Download binary](https://github.com/nikepan/clickhouse-bulk/releases) for you platorm
 
+or
+
+[Use docker image](https://hub.docker.com/r/nikepan/clickhouse-bulk/)
+
+
 or from sources (Go 1.8+):
 
 ```text
@@ -65,6 +70,11 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 }
 ```
 
+### Environment variables (used for docker image)
+
+CLICKHOUSE_SERVERS - comma separated list of servers
+CLICKHOUSE_FLUSH_COUNT - count of rows for insert
+CLICKHOUSE_FLUSH_INTERVAL - insert interval
 
 ### Quickstart
 
