@@ -1,4 +1,4 @@
-FROM golang:1.10 as builder
+FROM golang:1.10.1 as builder
 WORKDIR /go/src/github.com/nikepan/clickhouse-bulk
 RUN go get -u github.com/golang/dep/cmd/dep
 ADD . ./

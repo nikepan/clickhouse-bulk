@@ -1,11 +1,11 @@
 language: go
 sudo: false
 go:
-  - 1.9.3
-  - "1.10"
+  - 1.10.1
   - tip
 
 script:
+  - go get -t -v
   - go test -v -covermode=count -coverprofile=coverage.out
 
 after_success:
@@ -25,4 +25,4 @@ deploy:
   on:
     tags: true
     repo: nikepan/clickhouse-bulk
-    condition: $TRAVIS_GO_VERSION =~ ^1\.9\.[0-9]+$
+    condition: $TRAVIS_GO_VERSION =~ ^1\.10\.[0-9]+$
