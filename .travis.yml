@@ -6,6 +6,7 @@ go:
   - tip
 
 script:
+  - go get -t -v
   - go test -v -covermode=count -coverprofile=coverage.out
 
 after_success:

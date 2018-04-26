@@ -1,5 +1,5 @@
 install:
-	go get -t -v ./...
+	go get
 	go install
 
 build:
