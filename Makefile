@@ -1,7 +1,3 @@
-install:
-	go get
-	go install
-
 build:
 	go get
 	go build
