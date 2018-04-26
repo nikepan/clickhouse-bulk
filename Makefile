@@ -1,3 +1,7 @@
+install:
+	go get -t -v ./...
+	go install
+
 build:
 	go get
 	go build
