@@ -6,7 +6,7 @@ go:
 
 script:
   - go get -t -v
-  - go test -v -covermode=count -coverprofile=coverage.out
+  - go test -race -v -covermode=count -coverprofile=coverage.out
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
