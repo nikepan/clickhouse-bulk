@@ -56,7 +56,7 @@ func (t *Table) Content() string {
 	return strings.Join(t.Rows, "\n")
 }
 
-// Flush - sends collcted data in table to clickhouse
+// Flush - sends collected data in table to clickhouse
 func (t *Table) Flush() {
 	rows := t.Content()
 	t.Sender.Send(t.Name, rows)
@@ -137,19 +137,25 @@ func (c *Collector) WaitFlush() (err error) {
 
 // AddTable - adding table to collector
 func (c *Collector) AddTable(name string) {
-	t := NewTable(name, c.Sender, c.Count, c.FlushInterval)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.addTable(name)
+}
+
+func (c *Collector) addTable(name string) {
+	t := NewTable(name, c.Sender, c.Count, c.FlushInterval)
 	c.Tables[name] = t
 	t.RunTimer()
 }
 
 // Push - adding query to collector with query params (with query) and rows
 func (c *Collector) Push(params string, content string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	_, ok := c.Tables[params]
 	if !ok {
 		//log.Printf("'%+v'\n", params)
-		c.AddTable(params)
+		c.addTable(params)
 	}
 	c.Tables[params].Add(content)
 }
