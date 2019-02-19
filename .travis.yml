@@ -4,6 +4,9 @@ go:
   - 1.11.5
   - tip
 
+env:
+  GO111MODULE=on
+
 script:
   - go mod download
   - go test -race -v -covermode=atomic -coverprofile=coverage.out
