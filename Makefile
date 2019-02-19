@@ -1,9 +1,9 @@
 install:
-	go get
+	go mod download
 	go install
 
 build:
-	go get
+	go mod download
 	go build
 
 docker_build:
