@@ -9,7 +9,7 @@ env:
 
 script:
   - go mod download
-  - go test -race -v -covermode=atomic -coverprofile=coverage.out
+  - go test -v -race -covermode=atomic -coverprofile=coverage.out
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

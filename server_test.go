@@ -11,6 +11,8 @@ import (
 )
 
 func TestRunServer(t *testing.T) {
+	t.Parallel()
+
 	collector := NewCollector(&fakeSender{}, 1000, 1000)
 	server := NewServer("", collector, false)
 	e := echo.New()
