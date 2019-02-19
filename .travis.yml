@@ -4,9 +4,12 @@ go:
   - 1.11.5
   - tip
 
+env:
+  GO111MODULE=on
+
 script:
-  - go get -t -v
-  - go test -race -v -covermode=atomic -coverprofile=coverage.out
+  - go mod download
+  - go test -v -race -covermode=atomic -coverprofile=coverage.out
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
