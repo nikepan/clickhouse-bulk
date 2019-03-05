@@ -18,7 +18,7 @@ or
 [Use docker image](https://hub.docker.com/r/nikepan/clickhouse-bulk/)
 
 
-or from sources (Go 1.11+):
+or from sources (Go 1.12+):
 
 ```text
 git clone https://github.com/nikepan/clickhouse-bulk
