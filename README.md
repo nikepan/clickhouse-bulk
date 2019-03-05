@@ -21,9 +21,8 @@ or
 or from sources (Go 1.11+):
 
 ```text
-git clone github.com/nikepan/clickhouse-bulk
+git clone https://github.com/nikepan/clickhouse-bulk
 cd clickhouse-bulk
-go mod download
 go build
 ```
 
