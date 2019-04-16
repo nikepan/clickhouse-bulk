@@ -16,6 +16,7 @@ ADD . ./
 RUN go build -v
 
 FROM alpine:latest
+RUN apk add ca-certificates
 WORKDIR /app
 COPY --from=builder /go/src/github.com/nikepan/clickhouse-bulk/config.sample.json .
 COPY --from=builder /go/src/github.com/nikepan/clickhouse-bulk/clickhouse-bulk .
