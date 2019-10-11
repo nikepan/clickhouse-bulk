@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/labstack/echo"
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/labstack/echo"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server - main server object
@@ -59,6 +61,10 @@ func (server *Server) statusHandler(c echo.Context) error {
 	return c.JSON(200, Status{Status: "ok"})
 }
 
+func (server *Server) metricsHandler(c echo.Context) error {
+	return c.JSON(200, Status{Status: "ok"})
+}
+
 // Start - start http server
 func (server *Server) Start() error {
 	return server.echo.Start(server.Listen)
@@ -74,6 +80,7 @@ func InitServer(listen string, collector *Collector, debug bool) *Server {
 	server := NewServer(listen, collector, debug)
 	server.echo.POST("/", server.writeHandler)
 	server.echo.GET("/status", server.statusHandler)
+	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	return server
 }

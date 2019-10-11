@@ -1,6 +1,9 @@
 package main
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 // Sender interface for send requests
 type Sender interface {
@@ -11,11 +14,18 @@ type Sender interface {
 	WaitFlush() (err error)
 }
 
-type fakeSender struct{}
+type fakeSender struct {
+	sendHistory      []string
+	sendQueryHistory []string
+}
 
-func (s *fakeSender) Send(queryString string, data string) {}
+func (s *fakeSender) Send(queryString string, data string) {
+	s.sendHistory = append(s.sendHistory, queryString+" "+data)
+}
 
 func (s *fakeSender) SendQuery(queryString string, data string) (response string, status int) {
+	s.sendQueryHistory = append(s.sendQueryHistory, queryString+" "+data)
+	log.Printf("send query %+v\n", s.sendQueryHistory)
 	return "", http.StatusOK
 }
 

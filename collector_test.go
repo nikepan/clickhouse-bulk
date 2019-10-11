@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/stretchr/testify/assert"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const qTitle = "INSERT INTO table3 (c1, c2, c3) FORMAT TabSeparated"
@@ -34,7 +35,7 @@ func TestCollector_Push(t *testing.T) {
 	for i := 0; i < 10400; i++ {
 		c.Push(escTitle, qContent)
 	}
-	assert.Equal(t, c.Tables[escTitle].Count, 800)
+	assert.Equal(t, c.Tables[escTitle].GetCount(), 800)
 }
 
 func BenchmarkCollector_ParseQuery(b *testing.B) {

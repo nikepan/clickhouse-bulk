@@ -15,7 +15,7 @@ var regexValues = regexp.MustCompile("(?i)\\svalues\\s")
 type Table struct {
 	Name          string
 	Rows          []string
-	Count         int
+	count         int
 	FlushCount    int
 	FlushInterval int
 	mu            sync.Mutex
@@ -61,14 +61,14 @@ func (t *Table) Flush() {
 	rows := t.Content()
 	t.Sender.Send(t.Name, rows)
 	t.Rows = make([]string, 0, t.FlushCount)
-	t.Count = 0
+	t.count = 0
 }
 
 // CheckFlush - check if flush is need and sends data to clickhouse
 func (t *Table) CheckFlush() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.Count > 0 {
+	if t.count > 0 {
 		t.Flush()
 		return true
 	}
@@ -77,9 +77,14 @@ func (t *Table) CheckFlush() bool {
 
 // Empty - Checks if table is empty
 func (t *Table) Empty() bool {
+	return t.GetCount() == 0
+}
+
+// GetCount - Checks if table is empty
+func (t *Table) GetCount() int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.Count == 0
+	return t.count
 }
 
 // RunTimer - timer for periodical savings data
@@ -97,7 +102,7 @@ func (t *Table) Add(text string) {
 	count := strings.Count(text, "\n") + 1
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.Count += count
+	t.count += count
 	t.Rows = append(t.Rows, text)
 	if len(t.Rows) >= t.FlushCount {
 		t.Flush()
@@ -167,6 +172,7 @@ func (c *Collector) Push(params string, content string) {
 	}
 	table.Add(content)
 	c.mu.Unlock()
+	pushCounter.Inc()
 }
 
 // ParseQuery - parsing inbound query to unified format (params/query), content (query data)

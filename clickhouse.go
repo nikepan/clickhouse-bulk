@@ -52,6 +52,23 @@ func (c *Clickhouse) AddServer(url string) {
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{}})
 }
 
+// DumpServers - dump servers state to prometheus
+func (c *Clickhouse) DumpServers() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	good := 0
+	bad := 0
+	for _, s := range c.Servers {
+		if s.Bad {
+			bad++
+		} else {
+			good++
+		}
+	}
+	goodServers.Set(float64(good))
+	badServers.Set(float64(bad))
+}
+
 // GetNextServer - getting next server for request
 func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 	c.mu.Lock()
@@ -89,6 +106,7 @@ func (c *Clickhouse) Send(queryString string, data string) {
 
 // Dump - save query to file
 func (c *Clickhouse) Dump(params string, data string) error {
+	dumpCounter.Inc()
 	if c.Dumper != nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -119,7 +137,10 @@ func (c *Clickhouse) Run() {
 			if status != http.StatusOK {
 				log.Printf("Send ERROR %+v: %+v\n", status, resp)
 				c.Dump(data.Params, data.Content)
+			} else {
+				sentCounter.Inc()
 			}
+			c.DumpServers()
 			c.wg.Done()
 		}
 	}
@@ -161,7 +182,6 @@ func (c *Clickhouse) SendQuery(queryString string, data string) (response string
 			}
 			return r, status
 		}
-		c.Dump(queryString, data)
 		return "No working clickhouse servers", http.StatusBadGateway
 	}
 }
