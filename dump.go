@@ -8,16 +8,14 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
-// NoDumps - signal that dumps not found
-type NoDumps struct {
-}
+const defaultDumpCheckInterval = 30000
 
-func (e NoDumps) Error() string {
-	return "No dumps"
-}
+// ErrNoDumps - signal that dumps not found
+var ErrNoDumps = errors.New("No dumps")
 
 // Dumper - interface for dump data
 type Dumper interface {
@@ -29,6 +27,7 @@ type FileDumper struct {
 	Path        string
 	DumpNum     int
 	LockedFiles map[string]bool
+	mu          sync.Mutex
 }
 
 func (d *FileDumper) makePath(id string) string {
@@ -45,6 +44,8 @@ func (d *FileDumper) checkDir() error {
 
 // Dump - dumps data to files
 func (d *FileDumper) Dump(params string, data string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	err := d.checkDir()
 	if err != nil {
 		return err
@@ -52,7 +53,7 @@ func (d *FileDumper) Dump(params string, data string) error {
 	d.DumpNum++
 	err = ioutil.WriteFile(path.Join(d.Path, "dump"+strconv.Itoa(d.DumpNum)+".dmp"), []byte(params+"\n"+data), 0644)
 	if err != nil {
-		log.Printf("dump error: %+v\n", err)
+		log.Printf("ERROR: dump to file: %+v\n", err)
 	}
 	return err
 }
@@ -68,7 +69,7 @@ func (d *FileDumper) GetDump() (string, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	dumpFiles := make([]string, 10)
+	dumpFiles := make([]string, 0)
 	for _, f := range files {
 		if filepath.Ext(f.Name()) == ".dmp" {
 			dumpFiles = append(dumpFiles, f.Name())
@@ -83,7 +84,7 @@ func (d *FileDumper) GetDump() (string, error) {
 			return f, err
 		}
 	}
-	return "", &NoDumps{}
+	return "", ErrNoDumps
 }
 
 // GetDumpData - get dump data from filesystem
@@ -102,26 +103,29 @@ func (d *FileDumper) DeleteDump(id string) error {
 
 // ProcessNextDump - try to send next dump to server
 func (d *FileDumper) ProcessNextDump(sender Sender) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	f, err := d.GetDump()
-	if errors.Is(err, NoDumps{}) {
+	if errors.Is(err, ErrNoDumps) {
 		return err
 	}
 	if err != nil {
-		log.Printf("dump search error: %+v\n", err)
+		log.Printf("ERROR: dump search: %+v\n", err)
 	}
 	if f == "" {
 		return nil
 	}
 	data, err := d.GetDumpData(f)
 	if err != nil {
-		log.Printf("dump read error: %+v\n", err)
+		log.Printf("ERROR: dump read: %+v\n", err)
 	}
 	_, status := sender.SendQuery(data, "")
 	if status < 300 {
+		log.Printf("INFO: dump sended: %+v\n", f)
 		err := d.DeleteDump(f)
 		if err != nil {
 			d.LockedFiles[f] = true
-			log.Printf("dump delete error: %+v\n", err)
+			log.Printf("ERROR: dump delete: %+v\n", err)
 		}
 	}
 	return err
@@ -130,6 +134,9 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 // Listen - reads dumps from disk and try to send it
 func (d *FileDumper) Listen(sender Sender, interval int) {
 	d.LockedFiles = make(map[string]bool)
+	if interval == 0 {
+		interval = defaultDumpCheckInterval
+	}
 	ticker := time.NewTicker(time.Millisecond * time.Duration(interval))
 	go func() {
 		for range ticker.C {

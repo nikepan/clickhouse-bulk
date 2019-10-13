@@ -135,7 +135,7 @@ func (c *Clickhouse) Run() {
 			data := datas[0].(ClickhouseRequest)
 			resp, status := c.SendQuery(data.Params, data.Content)
 			if status != http.StatusOK {
-				log.Printf("Send ERROR %+v: %+v\n", status, resp)
+				log.Printf("ERROR: Send %+v: %+v\n", status, resp)
 				c.Dump(data.Params, data.Content)
 			} else {
 				sentCounter.Inc()
@@ -156,7 +156,7 @@ func (c *Clickhouse) WaitFlush() (err error) {
 func (srv *ClickhouseServer) SendQuery(queryString string, data string) (response string, status int) {
 	if srv.URL != "" {
 
-		log.Printf("send %+v rows to %+v of %+v\n", strings.Count(data, "\n")+1, srv.URL, queryString)
+		log.Printf("INFO: send %+v rows to %+v of %+v\n", strings.Count(data, "\n")+1, srv.URL, queryString)
 
 		resp, err := srv.Client.Post(srv.URL+"?"+queryString, "", strings.NewReader(data))
 		if err != nil {

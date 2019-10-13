@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"sync"
 )
 
 // Sender interface for send requests
@@ -17,15 +18,18 @@ type Sender interface {
 type fakeSender struct {
 	sendHistory      []string
 	sendQueryHistory []string
+	mu               sync.Mutex
 }
 
 func (s *fakeSender) Send(queryString string, data string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.sendHistory = append(s.sendHistory, queryString+" "+data)
 }
 
 func (s *fakeSender) SendQuery(queryString string, data string) (response string, status int) {
 	s.sendQueryHistory = append(s.sendQueryHistory, queryString+" "+data)
-	log.Printf("send query %+v\n", s.sendQueryHistory)
+	log.Printf("DEBUG: send query: %+v\n", s.sendQueryHistory)
 	return "", http.StatusOK
 }
 

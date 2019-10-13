@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -46,6 +47,7 @@ func TestMain_MultiServer(t *testing.T) {
 	assert.False(t, collect.Empty())
 
 	SafeQuit(collect, sender)
+	time.Sleep(100) // wait for http servers process requests
 
 	if servers["s1"] == "ggg" {
 		assert.Equal(t, "fff", servers["s2"])
@@ -61,7 +63,7 @@ func TestMain_SafeQuit(t *testing.T) {
 	sender := &fakeSender{}
 	collect := NewCollector(sender, 1000, 1000)
 	collect.AddTable("test")
-	collect.Push("eee", "eee")
+	collect.Push("sss", "sss")
 
 	assert.False(t, collect.Empty())
 

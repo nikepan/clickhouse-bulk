@@ -36,7 +36,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 	s := string(q)
 
 	if server.Debug {
-		log.Printf("query %+v %+v\n", c.QueryString(), s)
+		log.Printf("DEBUG: query %+v %+v\n", c.QueryString(), s)
 	}
 
 	qs := c.QueryString()

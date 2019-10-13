@@ -49,12 +49,13 @@ type clickhouseConfig struct {
 }
 
 type config struct {
-	Listen        string           `json:"listen"`
-	Clickhouse    clickhouseConfig `json:"clickhouse"`
-	FlushCount    int              `json:"flush_count"`
-	FlushInterval int              `json:"flush_interval"`
-	DumpDir       string           `json:"dump_dir"`
-	Debug         bool             `json:"debug"`
+	Listen            string           `json:"listen"`
+	Clickhouse        clickhouseConfig `json:"clickhouse"`
+	FlushCount        int              `json:"flush_count"`
+	FlushInterval     int              `json:"flush_interval"`
+	DumpCheckInterval int              `json:"dump_check_interval"`
+	DumpDir           string           `json:"dump_dir"`
+	Debug             bool             `json:"debug"`
 }
 
 // SafeQuit - safe prepare to quit
@@ -147,6 +148,8 @@ func main() {
 			}
 		}
 	}()
+
+	dumper.Listen(sender, cnf.DumpCheckInterval)
 
 	err = srv.Start()
 	if err != nil {

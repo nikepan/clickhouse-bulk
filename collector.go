@@ -167,7 +167,6 @@ func (c *Collector) Push(params string, content string) {
 	c.mu.Lock()
 	table, ok = c.Tables[params]
 	if !ok {
-		//log.Printf("'%+v'\n", params)
 		table = c.addTable(params)
 	}
 	table.Add(content)

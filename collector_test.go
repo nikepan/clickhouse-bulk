@@ -35,7 +35,7 @@ func TestCollector_Push(t *testing.T) {
 	for i := 0; i < 10400; i++ {
 		c.Push(escTitle, qContent)
 	}
-	assert.Equal(t, c.Tables[escTitle].GetCount(), 800)
+	assert.Equal(t, 800, c.Tables[escTitle].GetCount())
 }
 
 func BenchmarkCollector_ParseQuery(b *testing.B) {
@@ -123,11 +123,14 @@ func TestCollector_ParseQuery(t *testing.T) {
 }
 
 func TestTable_CheckFlush(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1)
+	c := NewCollector(&fakeSender{}, 1000, 1000)
 	c.Push(qTitle, qContent)
+	count := 0
 	for !c.Tables[qTitle].Empty() {
-		time.Sleep(10)
+		time.Sleep(time.Millisecond * time.Duration(100))
+		count++
 	}
+	assert.True(t, count >= 9)
 }
 
 func TestCollector_FlushAll(t *testing.T) {

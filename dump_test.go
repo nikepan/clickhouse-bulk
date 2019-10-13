@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,8 +27,7 @@ func TestDump_Dump(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Len(t, sender.sendQueryHistory, 1)
 	err = dumper.ProcessNextDump(sender)
-	assert.True(t, errors.Is(err, NoDumps{}))
+	assert.True(t, errors.Is(err, ErrNoDumps))
 	assert.Len(t, sender.sendQueryHistory, 1)
-
-	// os.Remove(dumpDir)
+	os.Remove(dumpDir)
 }
