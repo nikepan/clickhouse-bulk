@@ -14,7 +14,7 @@ import (
 
 func TestMain_MultiServer(t *testing.T) {
 
-	servers := make(map[string]string)
+	received := make([]string, 0)
 	var mu sync.Mutex
 
 	s1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +22,7 @@ func TestMain_MultiServer(t *testing.T) {
 		req, _ := ioutil.ReadAll(r.Body)
 		mu.Lock()
 		defer mu.Unlock()
-		servers["s1"] = string(req)
+		received = append(received, string(req))
 	}))
 	defer s1.Close()
 
@@ -31,7 +31,7 @@ func TestMain_MultiServer(t *testing.T) {
 		req, _ := ioutil.ReadAll(r.Body)
 		mu.Lock()
 		defer mu.Unlock()
-		servers["s2"] = string(req)
+		received = append(received, string(req))
 	}))
 	defer s2.Close()
 
@@ -49,12 +49,7 @@ func TestMain_MultiServer(t *testing.T) {
 	SafeQuit(collect, sender)
 	time.Sleep(100) // wait for http servers process requests
 
-	if servers["s1"] == "ggg" {
-		assert.Equal(t, "fff", servers["s2"])
-	} else if servers["s1"] == "fff" {
-		assert.Equal(t, "ggg", servers["s2"])
-	}
-
+	assert.Equal(t, 3, len(received))
 	assert.True(t, collect.Empty())
 	assert.True(t, sender.Empty())
 }
