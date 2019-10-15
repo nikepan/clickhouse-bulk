@@ -1,44 +1,119 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRunServer(t *testing.T) {
 	collector := NewCollector(&fakeSender{}, 1000, 1000)
-	server := NewServer("", collector, false)
-	e := echo.New()
-	e.POST("/", server.writeHandler)
+	server := InitServer("", collector, false)
+	go server.Start()
+	server.echo.POST("/", server.writeHandler)
 
-	status, resp := request("POST", "/", "", e)
+	status, resp := request("POST", "/", "", server.echo)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
-	status, resp = request("POST", "/?query="+escSelect, "", e)
+	status, resp = request("POST", "/?query="+escSelect, "", server.echo)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
-	status, resp = request("POST", "/?query="+escTitle, qContent, e)
+	status, resp = request("POST", "/?query="+escTitle, qContent, server.echo)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
-	status, resp = authRequest("POST", "default", "", "/?query="+escTitle, qContent, e)
+	status, resp = authRequest("POST", "default", "", "/?query="+escTitle, qContent, server.echo)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
-	status, resp = authRequest("POST", "default", "", "/", "", e)
+	status, resp = authRequest("POST", "default", "", "/", "", server.echo)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
-	e.GET("/status", server.statusHandler)
-	status, _ = request("GET", "/status", "", e)
+	server.echo.GET("/status", server.statusHandler)
+	status, _ = request("GET", "/status", "", server.echo)
 	assert.Equal(t, status, http.StatusOK)
+
+	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+	status, _ = request("GET", "/metrics", "", server.echo)
+	assert.Equal(t, status, http.StatusOK)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	server.Shutdown(ctx)
+}
+
+func TestServer_SafeQuit(t *testing.T) {
+	sender := &fakeSender{}
+	collect := NewCollector(sender, 1000, 1000)
+	collect.AddTable("test")
+	collect.Push("sss", "sss")
+
+	assert.False(t, collect.Empty())
+
+	SafeQuit(collect, sender)
+
+	assert.True(t, collect.Empty())
+	assert.True(t, sender.Empty())
+}
+
+func TestServer_MultiServer(t *testing.T) {
+
+	received := make([]string, 0)
+	var mu sync.Mutex
+
+	s1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "")
+		req, _ := ioutil.ReadAll(r.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, string(req))
+	}))
+	defer s1.Close()
+
+	s2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "")
+		req, _ := ioutil.ReadAll(r.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, string(req))
+	}))
+	defer s2.Close()
+
+	sender := NewClickhouse(10, 10)
+	sender.AddServer(s1.URL)
+	sender.AddServer(s2.URL)
+	collect := NewCollector(sender, 1000, 1000)
+	collect.AddTable("test")
+	collect.Push("eee", "eee")
+	collect.Push("fff", "fff")
+	collect.Push("ggg", "ggg")
+
+	assert.False(t, collect.Empty())
+
+	SafeQuit(collect, sender)
+	time.Sleep(100) // wait for http servers process requests
+
+	assert.Equal(t, 3, len(received))
+	assert.True(t, collect.Empty())
+	assert.True(t, sender.Empty())
+
+	cnf, err := ReadConfig("wrong_config.json")
+	assert.Nil(t, err)
+	go RunServer(cnf)
+	time.Sleep(50)
 }
 
 func request(method, path string, body string, e *echo.Echo) (int, string) {

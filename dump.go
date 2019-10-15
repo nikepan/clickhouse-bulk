@@ -160,7 +160,9 @@ func (d *FileDumper) Listen(sender Sender, interval int) {
 			for {
 				err := d.ProcessNextDump(sender)
 				if err != nil {
-					log.Printf("WARNING: %+v\n", err)
+					if !errors.Is(err, ErrNoDumps) {
+						log.Printf("WARNING: %+v\n", err)
+					}
 					break
 				}
 			}
