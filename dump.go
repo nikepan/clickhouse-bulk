@@ -37,7 +37,7 @@ func (d *FileDumper) makePath(id string) string {
 func (d *FileDumper) checkDir() error {
 	_, err := os.Stat(d.Path)
 	if os.IsNotExist(err) {
-		return os.Mkdir(d.Path, 777)
+		return os.Mkdir(d.Path, 0777)
 	}
 	return err
 }
