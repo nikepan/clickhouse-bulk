@@ -180,7 +180,7 @@ func (srv *ClickhouseServer) SendQuery(queryString string, data string) (respons
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)
 		if resp.StatusCode >= 500 {
-			return s, resp.StatusCode, ErrServerIsDown
+			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
 			err = fmt.Errorf("wrong server status %+v", resp.StatusCode)
 		}

@@ -117,7 +117,7 @@ func TestServer_MultiServer(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 10, cnf.DumpCheckInterval)
 	go RunServer(cnf)
-	time.Sleep(50)
+	time.Sleep(1000)
 }
 
 func request(method, path string, body string, e *echo.Echo) (int, string) {
