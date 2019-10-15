@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -19,9 +20,10 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 	s.SendQuery("", "")
 	s = c.GetNextServer()
 	assert.Equal(t, "http://127.0.0.1:8124", s.URL)
-	resp, status := s.SendQuery("", "")
+	resp, status, err := s.SendQuery("", "")
 	assert.NotEqual(t, "", resp)
 	assert.Equal(t, http.StatusBadGateway, status)
+	assert.True(t, errors.Is(err, ErrServerIsDown))
 	assert.Equal(t, true, s.Bad)
 	c.SendQuery("", "")
 }
@@ -40,8 +42,9 @@ func TestClickhouse_SendQuery(t *testing.T) {
 	c.AddServer("")
 	c.GetNextServer()
 	c.Servers[0].Bad = true
-	_, status := c.SendQuery("", "")
-	assert.Equal(t, http.StatusBadGateway, status)
+	_, status, err := c.SendQuery("", "")
+	assert.Equal(t, 0, status)
+	assert.True(t, errors.Is(err, ErrNoServers))
 }
 
 func TestClickhouse_SendQuery1(t *testing.T) {

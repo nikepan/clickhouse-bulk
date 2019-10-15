@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -35,6 +37,12 @@ type ClickhouseRequest struct {
 	Params  string
 	Content string
 }
+
+// ErrServerIsDown - signals about server is down
+var ErrServerIsDown = errors.New("server is down")
+
+// ErrNoServers - signals about no working servers
+var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
 func NewClickhouse(downTimeout int, connectTimeout int) (c *Clickhouse) {
@@ -140,9 +148,9 @@ func (c *Clickhouse) Run() {
 		datas, err = c.Queue.Poll(1, time.Second*5)
 		if err == nil {
 			data := datas[0].(ClickhouseRequest)
-			resp, status := c.SendQuery(data.Params, data.Content)
-			if status != http.StatusOK {
-				log.Printf("ERROR: Send %+v: %+v\n", status, resp)
+			resp, status, err := c.SendQuery(data.Params, data.Content)
+			if err != nil {
+				log.Printf("ERROR: Send (%+v) %+v; response %+v\n", status, err, resp)
 				c.Dump(data.Params, data.Content)
 			} else {
 				sentCounter.Inc()
@@ -160,35 +168,39 @@ func (c *Clickhouse) WaitFlush() (err error) {
 }
 
 // SendQuery - sends query to server and return result
-func (srv *ClickhouseServer) SendQuery(queryString string, data string) (response string, status int) {
+func (srv *ClickhouseServer) SendQuery(queryString string, data string) (response string, status int, err error) {
 	if srv.URL != "" {
-
 		log.Printf("INFO: send %+v rows to %+v of %+v\n", strings.Count(data, "\n")+1, srv.URL, queryString)
 
 		resp, err := srv.Client.Post(srv.URL+"?"+queryString, "", strings.NewReader(data))
 		if err != nil {
 			srv.Bad = true
-			return err.Error(), http.StatusBadGateway
+			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)
-		return s, resp.StatusCode
+		if resp.StatusCode >= 500 {
+			return s, resp.StatusCode, ErrServerIsDown
+		} else if resp.StatusCode >= 400 {
+			err = fmt.Errorf("wrong server status %+v", resp.StatusCode)
+		}
+		return s, resp.StatusCode, err
 	}
 
-	return "", http.StatusOK
+	return "", http.StatusOK, err
 }
 
 // SendQuery - sends query to server and return result (with server cycle)
-func (c *Clickhouse) SendQuery(queryString string, data string) (response string, status int) {
+func (c *Clickhouse) SendQuery(queryString string, data string) (response string, status int, err error) {
 	for {
 		s := c.GetNextServer()
 		if s != nil {
-			r, status := s.SendQuery(queryString, data)
-			if status == http.StatusBadGateway {
+			response, status, err = s.SendQuery(queryString, data)
+			if errors.Is(err, ErrServerIsDown) {
 				continue
 			}
-			return r, status
+			return response, status, err
 		}
-		return "No working clickhouse servers", http.StatusBadGateway
+		return response, status, ErrNoServers
 	}
 }

@@ -9,7 +9,7 @@ import (
 // Sender interface for send requests
 type Sender interface {
 	Send(queryString string, data string)
-	SendQuery(queryString string, data string) (response string, status int)
+	SendQuery(queryString string, data string) (response string, status int, err error)
 	Len() int64
 	Empty() bool
 	WaitFlush() (err error)
@@ -27,10 +27,10 @@ func (s *fakeSender) Send(queryString string, data string) {
 	s.sendHistory = append(s.sendHistory, queryString+" "+data)
 }
 
-func (s *fakeSender) SendQuery(queryString string, data string) (response string, status int) {
+func (s *fakeSender) SendQuery(queryString string, data string) (response string, status int, err error) {
 	s.sendQueryHistory = append(s.sendQueryHistory, queryString+" "+data)
 	log.Printf("DEBUG: send query: %+v\n", s.sendQueryHistory)
-	return "", http.StatusOK
+	return "", http.StatusOK, nil
 }
 
 func (s *fakeSender) Len() int64 {

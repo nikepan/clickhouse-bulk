@@ -135,9 +135,9 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	if err != nil {
 		log.Printf("ERROR: dump read: %+v\n", err)
 	}
-	_, status := sender.SendQuery(data, "")
-	if status > 299 {
-		return fmt.Errorf("server status %+v", status)
+	_, status, err := sender.SendQuery(data, "")
+	if err != nil {
+		return fmt.Errorf("server error (%+v) %+v", status, err)
 	}
 	log.Printf("INFO: dump sended: %+v\n", f)
 	err = d.DeleteDump(f)

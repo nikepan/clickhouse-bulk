@@ -57,7 +57,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
-	resp, status := server.Collector.Sender.SendQuery(params, content)
+	resp, status, _ := server.Collector.Sender.SendQuery(params, content)
 	return c.String(status, resp)
 }
 
