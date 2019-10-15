@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -27,5 +28,12 @@ func TestDump_Dump(t *testing.T) {
 	err = dumper.ProcessNextDump(sender)
 	assert.True(t, errors.Is(err, ErrNoDumps))
 	assert.Len(t, sender.sendQueryHistory, 1)
+
+	dumper.Listen(sender, 1)
+	c.Dump("eee", "eee")
+	time.Sleep(time.Second)
+	err = dumper.ProcessNextDump(sender)
+	assert.True(t, errors.Is(err, ErrNoDumps))
+
 	os.Remove(dumpDir)
 }

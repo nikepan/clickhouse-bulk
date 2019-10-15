@@ -67,3 +67,9 @@ func TestMain_SafeQuit(t *testing.T) {
 	assert.True(t, collect.Empty())
 	assert.True(t, sender.Empty())
 }
+
+func TestMain_ReadJSON(t *testing.T) {
+	cnf := config{}
+	err := ReadJSON("config.sample.json", &cnf)
+	assert.Nil(t, err)
+}

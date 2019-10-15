@@ -154,7 +154,7 @@ func (d *FileDumper) Listen(sender Sender, interval int) {
 	if interval == 0 {
 		interval = defaultDumpCheckInterval
 	}
-	ticker := time.NewTicker(time.Millisecond * time.Duration(interval))
+	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	go func() {
 		for range ticker.C {
 			for {
