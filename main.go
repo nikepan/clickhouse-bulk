@@ -44,8 +44,9 @@ var queuedDumps = prometheus.NewGauge(
 	})
 
 type clickhouseConfig struct {
-	Servers     []string `json:"servers"`
-	DownTimeout int      `json:"down_timeout"`
+	Servers        []string `json:"servers"`
+	DownTimeout    int      `json:"down_timeout"`
+	ConnectTimeout int      `json:"connect_timeout"`
 }
 
 type config struct {
@@ -119,9 +120,8 @@ func main() {
 	prometheus.MustRegister(goodServers)
 	prometheus.MustRegister(badServers)
 
-	dumper := new(FileDumper)
-	dumper.Path = cnf.DumpDir
-	sender := NewClickhouse(cnf.Clickhouse.DownTimeout)
+	dumper := NewDumper(cnf.DumpDir)
+	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout)
 	sender.Dumper = dumper
 	for _, url := range cnf.Clickhouse.Servers {
 		sender.AddServer(url)

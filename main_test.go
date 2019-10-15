@@ -35,7 +35,7 @@ func TestMain_MultiServer(t *testing.T) {
 	}))
 	defer s2.Close()
 
-	sender := NewClickhouse(10)
+	sender := NewClickhouse(10, 10)
 	sender.AddServer(s1.URL)
 	sender.AddServer(s2.URL)
 	collect := NewCollector(sender, 1000, 1000)

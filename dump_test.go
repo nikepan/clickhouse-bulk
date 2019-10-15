@@ -9,16 +9,14 @@ import (
 )
 
 func TestDump_Dump(t *testing.T) {
-	const dumpName = "dump1.dmp"
-	c := NewClickhouse(-1)
-	dumper := new(FileDumper)
+	c := NewClickhouse(-1, 10)
 	dumpDir := "dumptest"
-	dumper.Path = dumpDir
+	dumper := NewDumper(dumpDir)
 	c.Dumper = dumper
 	c.AddServer("")
 	c.Dump("eee", "eee")
 	assert.True(t, c.Empty())
-	buf, err := dumper.GetDumpData(dumpName)
+	buf, err := dumper.GetDumpData(dumper.dumpName(1))
 	assert.Nil(t, err)
 	assert.Equal(t, "eee\neee", string(buf))
 

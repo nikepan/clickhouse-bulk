@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-const defaultDumpCheckInterval = 30000
+const defaultDumpCheckInterval = 30
 
 // ErrNoDumps - signal that dumps not found
 var ErrNoDumps = errors.New("No dumps")
@@ -25,6 +26,7 @@ type Dumper interface {
 // FileDumper - dumps data to file system
 type FileDumper struct {
 	Path        string
+	DumpPrefix  string
 	DumpNum     int
 	LockedFiles map[string]bool
 	mu          sync.Mutex
@@ -42,6 +44,18 @@ func (d *FileDumper) checkDir() error {
 	return err
 }
 
+func (d *FileDumper) dumpName(num int) string {
+	return "dump" + d.DumpPrefix + "-" + strconv.Itoa(num) + ".dmp"
+}
+
+// NewDumper - create new dumper
+func NewDumper(path string) *FileDumper {
+	d := new(FileDumper)
+	d.Path = path
+	d.DumpPrefix = time.Now().Format("20060102150405")
+	return d
+}
+
 // Dump - dumps data to files
 func (d *FileDumper) Dump(params string, data string) error {
 	d.mu.Lock()
@@ -51,7 +65,9 @@ func (d *FileDumper) Dump(params string, data string) error {
 		return err
 	}
 	d.DumpNum++
-	err = ioutil.WriteFile(path.Join(d.Path, "dump"+strconv.Itoa(d.DumpNum)+".dmp"), []byte(params+"\n"+data), 0644)
+	err = ioutil.WriteFile(
+		path.Join(d.Path, d.dumpName(d.DumpNum)), []byte(params+"\n"+data), 0644,
+	)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
 	}
@@ -120,13 +136,14 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 		log.Printf("ERROR: dump read: %+v\n", err)
 	}
 	_, status := sender.SendQuery(data, "")
-	if status < 300 {
-		log.Printf("INFO: dump sended: %+v\n", f)
-		err := d.DeleteDump(f)
-		if err != nil {
-			d.LockedFiles[f] = true
-			log.Printf("ERROR: dump delete: %+v\n", err)
-		}
+	if status > 299 {
+		return fmt.Errorf("server status %+v", status)
+	}
+	log.Printf("INFO: dump sended: %+v\n", f)
+	err = d.DeleteDump(f)
+	if err != nil {
+		d.LockedFiles[f] = true
+		log.Printf("ERROR: dump delete: %+v\n", err)
 	}
 	return err
 }
@@ -143,6 +160,7 @@ func (d *FileDumper) Listen(sender Sender, interval int) {
 			for {
 				err := d.ProcessNextDump(sender)
 				if err != nil {
+					log.Printf("WARNING: %+v\n", err)
 					break
 				}
 			}

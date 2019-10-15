@@ -21,12 +21,13 @@ type ClickhouseServer struct {
 
 // Clickhouse - main clickhouse sender object
 type Clickhouse struct {
-	Servers     []*ClickhouseServer
-	Queue       *queue.Queue
-	mu          sync.Mutex
-	DownTimeout int
-	Dumper      Dumper
-	wg          sync.WaitGroup
+	Servers        []*ClickhouseServer
+	Queue          *queue.Queue
+	mu             sync.Mutex
+	DownTimeout    int
+	ConnectTimeout int
+	Dumper         Dumper
+	wg             sync.WaitGroup
 }
 
 // ClickhouseRequest - request struct for queue
@@ -36,9 +37,13 @@ type ClickhouseRequest struct {
 }
 
 // NewClickhouse - get clickhouse object
-func NewClickhouse(downTimeout int) (c *Clickhouse) {
+func NewClickhouse(downTimeout int, connectTimeout int) (c *Clickhouse) {
 	c = new(Clickhouse)
 	c.DownTimeout = downTimeout
+	c.ConnectTimeout = connectTimeout
+	if c.ConnectTimeout > 0 {
+		c.ConnectTimeout = 10
+	}
 	c.Servers = make([]*ClickhouseServer, 0)
 	c.Queue = queue.New(1000)
 	go c.Run()
@@ -49,7 +54,9 @@ func NewClickhouse(downTimeout int) (c *Clickhouse) {
 func (c *Clickhouse) AddServer(url string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{}})
+	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
+		Timeout: time.Second * time.Duration(c.ConnectTimeout),
+	}})
 }
 
 // DumpServers - dump servers state to prometheus

@@ -2,11 +2,12 @@
   "listen": ":8124",
   "flush_count": 10000,
   "flush_interval": 1000,
-  "dump_check_interval": 30000,
+  "dump_check_interval": 30,
   "debug": false,
   "dump_dir": "dumps",
   "clickhouse": {
     "down_timeout": 300,
+    "connect_timeout": 10,
     "servers": [
       "http://127.0.0.1:8123"
     ]
