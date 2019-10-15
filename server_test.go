@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -110,8 +111,11 @@ func TestServer_MultiServer(t *testing.T) {
 	assert.True(t, collect.Empty())
 	assert.True(t, sender.Empty())
 
+	os.Setenv("DUMP_CHECK_INTERVAL", "10")
 	cnf, err := ReadConfig("wrong_config.json")
+	os.Unsetenv("DUMP_CHECK_INTERVAL")
 	assert.Nil(t, err)
+	assert.Equal(t, 10, cnf.DumpCheckInterval)
 	go RunServer(cnf)
 	time.Sleep(50)
 }

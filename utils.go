@@ -43,6 +43,17 @@ func HasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.ToLower(s[0:len(prefix)]) == strings.ToLower(prefix)
 }
 
+func readEnvInt(name string, value *int) {
+	s := os.Getenv(name)
+	if s != "" {
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		}
+		*value = v
+	}
+}
+
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {
 	cnf := Config{}
@@ -55,21 +66,11 @@ func ReadConfig(configFile string) (Config, error) {
 		}
 	}
 
-	flushCount := os.Getenv("CLICKHOUSE_FLUSH_COUNT")
-	if flushCount != "" {
-		cnf.FlushCount, err = strconv.Atoi(flushCount)
-		if err != nil {
-			log.Fatalf("Wrong flush count env: %+v\n", err.Error())
-		}
-	}
-
-	flushInterval := os.Getenv("CLICKHOUSE_FLUSH_INTERVAL")
-	if flushInterval != "" {
-		cnf.FlushInterval, err = strconv.Atoi(flushInterval)
-		if err != nil {
-			log.Fatalf("Wrong flush interval env: %+v\n", err.Error())
-		}
-	}
+	readEnvInt("CLICKHOUSE_FLUSH_COUNT", &cnf.FlushCount)
+	readEnvInt("CLICKHOUSE_FLUSH_INTERVAL", &cnf.FlushInterval)
+	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
+	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
+	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
 
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")
 	if serversList != "" {
