@@ -161,6 +161,7 @@ func (c *Collector) Push(params string, content string) {
 	if ok {
 		table.Add(content)
 		c.mu.RUnlock()
+		pushCounter.Inc()
 		return
 	}
 	c.mu.RUnlock()
