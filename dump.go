@@ -126,14 +126,14 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 		return err
 	}
 	if err != nil {
-		log.Printf("ERROR: dump search: %+v\n", err)
+		return fmt.Errorf("Dump search error: %+v", err)
 	}
 	if f == "" {
 		return nil
 	}
 	data, err := d.GetDumpData(f)
 	if err != nil {
-		log.Printf("ERROR: dump read: %+v\n", err)
+		return fmt.Errorf("Dump read error: %+v", err)
 	}
 	_, status, err := sender.SendQuery(data, "")
 	if err != nil {
@@ -143,7 +143,7 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	err = d.DeleteDump(f)
 	if err != nil {
 		d.LockedFiles[f] = true
-		log.Printf("ERROR: dump delete: %+v\n", err)
+		return fmt.Errorf("Dump delete error: %+v", err)
 	}
 	return err
 }
@@ -161,7 +161,7 @@ func (d *FileDumper) Listen(sender Sender, interval int) {
 				err := d.ProcessNextDump(sender)
 				if err != nil {
 					if !errors.Is(err, ErrNoDumps) {
-						log.Printf("WARNING: %+v\n", err)
+						log.Printf("ERROR: %+v\n", err)
 					}
 					break
 				}
