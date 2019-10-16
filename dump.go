@@ -36,10 +36,12 @@ func (d *FileDumper) makePath(id string) string {
 	return path.Join(d.Path, id)
 }
 
-func (d *FileDumper) checkDir() error {
+func (d *FileDumper) checkDir(create bool) error {
 	_, err := os.Stat(d.Path)
 	if os.IsNotExist(err) {
-		return os.Mkdir(d.Path, 0777)
+		if create {
+			return os.Mkdir(d.Path, 0777)
+		}
 	}
 	return err
 }
@@ -60,7 +62,7 @@ func NewDumper(path string) *FileDumper {
 func (d *FileDumper) Dump(params string, data string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	err := d.checkDir()
+	err := d.checkDir(true)
 	if err != nil {
 		return err
 	}
@@ -76,7 +78,10 @@ func (d *FileDumper) Dump(params string, data string) error {
 
 // GetDump - get dump file from filesystem
 func (d *FileDumper) GetDump() (string, error) {
-	err := d.checkDir()
+	err := d.checkDir(false)
+	if os.IsNotExist(err) {
+		return "", ErrNoDumps
+	}
 	if err != nil {
 		return "", err
 	}

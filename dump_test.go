@@ -35,5 +35,6 @@ func TestDump_Dump(t *testing.T) {
 	err = dumper.ProcessNextDump(sender)
 	assert.True(t, errors.Is(err, ErrNoDumps))
 
-	os.Remove(dumpDir)
+	err = os.Remove(dumpDir)
+	assert.Nil(t, err)
 }
