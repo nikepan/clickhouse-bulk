@@ -129,7 +129,9 @@ func RunServer(cnf Config) {
 		}
 	}()
 
-	dumper.Listen(sender, cnf.DumpCheckInterval)
+	if cnf.DumpCheckInterval >= 0 {
+		dumper.Listen(sender, cnf.DumpCheckInterval)
+	}
 
 	err := srv.Start()
 	if err != nil {

@@ -58,7 +58,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
   "listen": ":8124", 
   "flush_count": 10000, // check by \n char
   "flush_interval": 1000, // milliseconds
-  "dump_check_interval": 30, // interval for try to send dumps (seconds)
+  "dump_check_interval": 30, // interval for try to send dumps (seconds); -1 to disable
   "debug": false, // log incoming requests
   "dump_dir": "dumps", // directory for dump unsended data (if clickhouse errors)
   "clickhouse": {
