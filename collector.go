@@ -14,12 +14,15 @@ var regexValues = regexp.MustCompile("(?i)\\svalues\\s")
 // Table - store query table info
 type Table struct {
 	Name          string
+	Query         string
+	Params        string
 	Rows          []string
 	count         int
 	FlushCount    int
 	FlushInterval int
 	mu            sync.Mutex
 	Sender        Sender
+	// todo add Last Error
 }
 
 // Collector - query collector
@@ -58,8 +61,8 @@ func (t *Table) Content() string {
 
 // Flush - sends collected data in table to clickhouse
 func (t *Table) Flush() {
-	rows := t.Content()
-	t.Sender.Send(t.Name, rows)
+	data := t.Query + "\n" + t.Content() + "\n"
+	t.Sender.Send(t.Params, data)
 	t.Rows = make([]string, 0, t.FlushCount)
 	t.count = 0
 }
@@ -99,10 +102,9 @@ func (t *Table) RunTimer() {
 
 // Add - Adding query to table
 func (t *Table) Add(text string) {
-	count := strings.Count(text, "\n") + 1
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.count += count
+	t.count++
 	t.Rows = append(t.Rows, text)
 	if len(t.Rows) >= t.FlushCount {
 		t.Flush()
@@ -147,8 +149,30 @@ func (c *Collector) AddTable(name string) {
 	c.addTable(name)
 }
 
+func (c *Collector) separateQuery(name string) (query string, params string) {
+	items := strings.Split(name, "&")
+	for _, p := range items {
+		if HasPrefix(p, "query=") {
+			query = p[6:]
+		} else {
+			params += "&" + p
+		}
+	}
+	if len(params) > 0 {
+		params = strings.TrimSpace(params[1:])
+	}
+	q, err := url.QueryUnescape(query)
+	if err != nil {
+		return "", name
+	}
+	return q, params
+}
+
 func (c *Collector) addTable(name string) *Table {
 	t := NewTable(name, c.Sender, c.Count, c.FlushInterval)
+	query, params := c.separateQuery(name)
+	t.Query = query
+	t.Params = params
 	c.Tables[name] = t
 	t.RunTimer()
 	return t

@@ -122,6 +122,13 @@ func TestCollector_ParseQuery(t *testing.T) {
 	assert.False(t, insert)
 }
 
+func TestCollector_separateQuery(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000)
+	query, params := c.separateQuery(escParamsAndSelect)
+	assert.Equal(t, qSelect, query)
+	assert.Equal(t, qParams, params)
+}
+
 func TestTable_CheckFlush(t *testing.T) {
 	c := NewCollector(&fakeSender{}, 1000, 1000)
 	c.Push(qTitle, qContent)

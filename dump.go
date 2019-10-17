@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -140,7 +141,16 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	if err != nil {
 		return fmt.Errorf("Dump read error: %+v", err)
 	}
-	_, status, err := sender.SendQuery(data, "")
+	if data == "" {
+		return nil
+	}
+	params := ""
+	lines := strings.Split(data, "\n")
+	if !HasPrefix(lines[0], "insert") {
+		params = lines[0]
+		data = strings.Join(lines[1:], "\n")
+	}
+	_, status, err := sender.SendQuery(params, data)
 	if err != nil {
 		return fmt.Errorf("server error (%+v) %+v", status, err)
 	}

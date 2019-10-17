@@ -75,8 +75,8 @@ func ReadConfig(configFile string) (Config, error) {
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")
 	if serversList != "" {
 		cnf.Clickhouse.Servers = strings.Split(serversList, ",")
-		log.Printf("use servers: %+v\n", serversList)
 	}
+	log.Printf("use servers: %+v\n", strings.Join(cnf.Clickhouse.Servers, ", "))
 
 	return cnf, err
 }

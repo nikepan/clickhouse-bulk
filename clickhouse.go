@@ -170,9 +170,13 @@ func (c *Clickhouse) WaitFlush() (err error) {
 // SendQuery - sends query to server and return result
 func (srv *ClickhouseServer) SendQuery(queryString string, data string) (response string, status int, err error) {
 	if srv.URL != "" {
-		log.Printf("INFO: send %+v rows to %+v of %+v\n", strings.Count(data, "\n")+1, srv.URL, queryString)
-
-		resp, err := srv.Client.Post(srv.URL+"?"+queryString, "", strings.NewReader(data))
+		lines := strings.Split(data, "\n")
+		log.Printf("INFO: send %+v rows to %+v of %+v\n", len(lines)-2, srv.URL, lines[0])
+		url := srv.URL
+		if queryString != "" {
+			url += "?" + queryString
+		}
+		resp, err := srv.Client.Post(url, "", strings.NewReader(data))
 		if err != nil {
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
@@ -197,6 +201,7 @@ func (c *Clickhouse) SendQuery(queryString string, data string) (response string
 		if s != nil {
 			response, status, err = s.SendQuery(queryString, data)
 			if errors.Is(err, ErrServerIsDown) {
+				log.Printf("ERROR: server down (%+v): %+v\n", status, response)
 				continue
 			}
 			return response, status, err
