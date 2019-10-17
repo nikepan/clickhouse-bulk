@@ -35,7 +35,7 @@ func TestCollector_Push(t *testing.T) {
 	for i := 0; i < 10400; i++ {
 		c.Push(escTitle, qContent)
 	}
-	assert.Equal(t, 800, c.Tables[escTitle].GetCount())
+	assert.Equal(t, 400, c.Tables[escTitle].GetCount())
 }
 
 func BenchmarkCollector_ParseQuery(b *testing.B) {
