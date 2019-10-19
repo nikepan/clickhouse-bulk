@@ -8,12 +8,17 @@ import (
 	"time"
 )
 
+const formatValues = "values"
+const formatTabSeparated = "tabseparated"
+
 var regexFormat = regexp.MustCompile("(?i)format\\s\\S+(\\s+)")
 var regexValues = regexp.MustCompile("(?i)\\svalues\\s")
+var regexGetFormat = regexp.MustCompile("(?i)format\\s(\\S+)")
 
 // Table - store query table info
 type Table struct {
 	Name          string
+	Format        string
 	Query         string
 	Params        string
 	Rows          []string
@@ -56,13 +61,18 @@ func NewCollector(sender Sender, count int, interval int) (c *Collector) {
 
 // Content - get text content of rowsfor query
 func (t *Table) Content() string {
-	return strings.Join(t.Rows, "\n")
+	return t.Query + "\n" + strings.Join(t.Rows, "\n")
 }
 
 // Flush - sends collected data in table to clickhouse
 func (t *Table) Flush() {
-	data := t.Query + "\n" + t.Content() + "\n"
-	t.Sender.Send(t.Params, data)
+	req := ClickhouseRequest{
+		Params:  t.Params,
+		Query:   t.Query,
+		Content: t.Content(),
+		Count:   t.count,
+	}
+	t.Sender.Send(&req)
 	t.Rows = make([]string, 0, t.FlushCount)
 	t.count = 0
 }
@@ -168,11 +178,21 @@ func (c *Collector) separateQuery(name string) (query string, params string) {
 	return q, params
 }
 
+func (c *Collector) getFormat(query string) (format string) {
+	format = formatValues
+	f := regexGetFormat.FindSubmatch([]byte(query))
+	if len(f) > 1 {
+		format = strings.TrimSpace(string(f[1]))
+	}
+	return format
+}
+
 func (c *Collector) addTable(name string) *Table {
 	t := NewTable(name, c.Sender, c.Count, c.FlushInterval)
 	query, params := c.separateQuery(name)
 	t.Query = query
 	t.Params = params
+	t.Format = c.getFormat(query)
 	c.Tables[name] = t
 	t.RunTimer()
 	return t
@@ -242,7 +262,7 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 			params = "query=" + url.QueryEscape(q)
 		}
 	}
-	return params, content, insert
+	return strings.TrimSpace(params), strings.TrimSpace(content), insert
 }
 
 // Parse - parsing text for query and data

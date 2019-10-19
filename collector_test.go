@@ -129,6 +129,12 @@ func TestCollector_separateQuery(t *testing.T) {
 	assert.Equal(t, qParams, params)
 }
 
+func TestTable_getFormat(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000)
+	f := c.getFormat(qTitle)
+	assert.Equal(t, "TabSeparated", f)
+}
+
 func TestTable_CheckFlush(t *testing.T) {
 	c := NewCollector(&fakeSender{}, 1000, 1000)
 	c.Push(qTitle, qContent)

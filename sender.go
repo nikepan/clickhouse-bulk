@@ -8,8 +8,8 @@ import (
 
 // Sender interface for send requests
 type Sender interface {
-	Send(queryString string, data string)
-	SendQuery(queryString string, data string) (response string, status int, err error)
+	Send(r *ClickhouseRequest)
+	SendQuery(r *ClickhouseRequest) (response string, status int, err error)
 	Len() int64
 	Empty() bool
 	WaitFlush() (err error)
@@ -21,14 +21,14 @@ type fakeSender struct {
 	mu               sync.Mutex
 }
 
-func (s *fakeSender) Send(queryString string, data string) {
+func (s *fakeSender) Send(r *ClickhouseRequest) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sendHistory = append(s.sendHistory, queryString+" "+data)
+	s.sendHistory = append(s.sendHistory, r.Params+" "+r.Content)
 }
 
-func (s *fakeSender) SendQuery(queryString string, data string) (response string, status int, err error) {
-	s.sendQueryHistory = append(s.sendQueryHistory, queryString+" "+data)
+func (s *fakeSender) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
+	s.sendQueryHistory = append(s.sendQueryHistory, r.Params+r.Content)
 	log.Printf("DEBUG: send query: %+v\n", s.sendQueryHistory)
 	return "", http.StatusOK, nil
 }

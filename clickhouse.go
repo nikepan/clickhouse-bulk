@@ -35,7 +35,9 @@ type Clickhouse struct {
 // ClickhouseRequest - request struct for queue
 type ClickhouseRequest struct {
 	Params  string
+	Query   string
 	Content string
+	Count   int
 }
 
 // ErrServerIsDown - signals about server is down
@@ -113,10 +115,9 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 }
 
 // Send - send request to next server
-func (c *Clickhouse) Send(queryString string, data string) {
-	req := ClickhouseRequest{queryString, data}
+func (c *Clickhouse) Send(r *ClickhouseRequest) {
 	c.wg.Add(1)
-	c.Queue.Put(req)
+	c.Queue.Put(r)
 }
 
 // Dump - save query to file
@@ -147,8 +148,8 @@ func (c *Clickhouse) Run() {
 	for {
 		datas, err = c.Queue.Poll(1, time.Second*5)
 		if err == nil {
-			data := datas[0].(ClickhouseRequest)
-			resp, status, err := c.SendQuery(data.Params, data.Content)
+			data := datas[0].(*ClickhouseRequest)
+			resp, status, err := c.SendQuery(data)
 			if err != nil {
 				log.Printf("ERROR: Send (%+v) %+v; response %+v\n", status, err, resp)
 				c.Dump(data.Params, data.Content)
@@ -168,15 +169,14 @@ func (c *Clickhouse) WaitFlush() (err error) {
 }
 
 // SendQuery - sends query to server and return result
-func (srv *ClickhouseServer) SendQuery(queryString string, data string) (response string, status int, err error) {
+func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	if srv.URL != "" {
-		lines := strings.Split(data, "\n")
-		log.Printf("INFO: send %+v rows to %+v of %+v\n", len(lines)-2, srv.URL, lines[0])
 		url := srv.URL
-		if queryString != "" {
-			url += "?" + queryString
+		if r.Params != "" {
+			url += "?" + r.Params
 		}
-		resp, err := srv.Client.Post(url, "", strings.NewReader(data))
+		log.Printf("INFO: send %+v rows to %+v of %+v\n", r.Count, url, r.Query)
+		resp, err := srv.Client.Post(url, "", strings.NewReader(r.Content))
 		if err != nil {
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
@@ -186,7 +186,7 @@ func (srv *ClickhouseServer) SendQuery(queryString string, data string) (respons
 		if resp.StatusCode >= 500 {
 			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
-			err = fmt.Errorf("wrong server status %+v", resp.StatusCode)
+			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)
 		}
 		return s, resp.StatusCode, err
 	}
@@ -195,11 +195,11 @@ func (srv *ClickhouseServer) SendQuery(queryString string, data string) (respons
 }
 
 // SendQuery - sends query to server and return result (with server cycle)
-func (c *Clickhouse) SendQuery(queryString string, data string) (response string, status int, err error) {
+func (c *Clickhouse) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	for {
 		s := c.GetNextServer()
 		if s != nil {
-			response, status, err = s.SendQuery(queryString, data)
+			response, status, err = s.SendQuery(r)
 			if errors.Is(err, ErrServerIsDown) {
 				log.Printf("ERROR: server down (%+v): %+v\n", status, response)
 				continue

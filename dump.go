@@ -150,7 +150,7 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 		params = lines[0]
 		data = strings.Join(lines[1:], "\n")
 	}
-	_, status, err := sender.SendQuery(params, data)
+	_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data})
 	if err != nil {
 		return fmt.Errorf("server error (%+v) %+v", status, err)
 	}
