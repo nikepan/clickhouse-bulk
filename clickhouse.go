@@ -153,7 +153,7 @@ func (c *Clickhouse) Run() {
 			if err != nil {
 				log.Printf("ERROR: Send (%+v) %+v; response %+v\n", status, err, resp)
 				prefix := "1"
-				if status >= 400 && status < 500 {
+				if status >= 400 && status < 502 {
 					prefix = "2"
 				}
 				c.Dump(data.Params, data.Content, prefix)
@@ -187,7 +187,8 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		}
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)
-		if resp.StatusCode >= 500 {
+		if resp.StatusCode >= 502 {
+			srv.Bad = true
 			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
 			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)
