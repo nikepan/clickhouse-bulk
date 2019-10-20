@@ -121,12 +121,12 @@ func (c *Clickhouse) Send(r *ClickhouseRequest) {
 }
 
 // Dump - save query to file
-func (c *Clickhouse) Dump(params string, data string) error {
+func (c *Clickhouse) Dump(params string, data string, prefix string) error {
 	dumpCounter.Inc()
 	if c.Dumper != nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		return c.Dumper.Dump(params, data)
+		return c.Dumper.Dump(params, data, prefix)
 	}
 	return nil
 }
@@ -152,7 +152,11 @@ func (c *Clickhouse) Run() {
 			resp, status, err := c.SendQuery(data)
 			if err != nil {
 				log.Printf("ERROR: Send (%+v) %+v; response %+v\n", status, err, resp)
-				c.Dump(data.Params, data.Content)
+				prefix := "1"
+				if status >= 400 && status < 500 {
+					prefix = "2"
+				}
+				c.Dump(data.Params, data.Content, prefix)
 			} else {
 				sentCounter.Inc()
 			}

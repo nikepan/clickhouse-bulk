@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,7 +22,7 @@ var ErrNoDumps = errors.New("No dumps")
 
 // Dumper - interface for dump data
 type Dumper interface {
-	Dump(params string, data string) error
+	Dump(params string, data string, prefix string) error
 }
 
 // FileDumper - dumps data to file system
@@ -47,8 +48,8 @@ func (d *FileDumper) checkDir(create bool) error {
 	return err
 }
 
-func (d *FileDumper) dumpName(num int) string {
-	return "dump" + d.DumpPrefix + "-" + strconv.Itoa(num) + ".dmp"
+func (d *FileDumper) dumpName(num int, prefix string) string {
+	return "dump" + d.DumpPrefix + prefix + "-" + strconv.Itoa(num) + ".dmp"
 }
 
 // NewDumper - create new dumper
@@ -60,7 +61,7 @@ func NewDumper(path string) *FileDumper {
 }
 
 // Dump - dumps data to files
-func (d *FileDumper) Dump(params string, data string) error {
+func (d *FileDumper) Dump(params string, data string, prefix string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	err := d.checkDir(true)
@@ -69,7 +70,7 @@ func (d *FileDumper) Dump(params string, data string) error {
 	}
 	d.DumpNum++
 	err = ioutil.WriteFile(
-		path.Join(d.Path, d.dumpName(d.DumpNum)), []byte(params+"\n"+data), 0644,
+		path.Join(d.Path, d.dumpName(d.DumpNum, prefix)), []byte(params+"\n"+data), 0644,
 	)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
@@ -97,6 +98,7 @@ func (d *FileDumper) GetDump() (string, error) {
 			dumpFiles = append(dumpFiles, f.Name())
 		}
 	}
+	sort.Strings(dumpFiles)
 
 	queuedDumps.Set(float64(len(dumpFiles)))
 

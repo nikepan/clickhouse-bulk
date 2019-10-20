@@ -15,9 +15,9 @@ func TestDump_Dump(t *testing.T) {
 	dumper := NewDumper(dumpDir)
 	c.Dumper = dumper
 	c.AddServer("")
-	c.Dump("eee", "eee")
+	c.Dump("eee", "eee", "")
 	assert.True(t, c.Empty())
-	buf, err := dumper.GetDumpData(dumper.dumpName(1))
+	buf, err := dumper.GetDumpData(dumper.dumpName(1, ""))
 	assert.Nil(t, err)
 	assert.Equal(t, "eee\neee", string(buf))
 
@@ -30,7 +30,7 @@ func TestDump_Dump(t *testing.T) {
 	assert.Len(t, sender.sendQueryHistory, 1)
 
 	dumper.Listen(sender, 1)
-	c.Dump("eee", "eee")
+	c.Dump("eee", "eee", "")
 	time.Sleep(time.Second)
 	err = dumper.ProcessNextDump(sender)
 	assert.True(t, errors.Is(err, ErrNoDumps))
