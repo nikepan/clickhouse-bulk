@@ -82,6 +82,16 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 `./clickhouse-bulk`
 and send queries to :8124
 
+### Metrics
+manual check main metrics
+`curl -s http://127.0.0.1:8124/metrics | grep "^ch_"`
+* `ch_bad_servers 0` - actual count of bad servers
+* `ch_dump_count 0` - dumps saved from launch
+* `ch_queued_dumps 0` - actual dump files id directory
+* `ch_good_servers 1` - actual good servers count
+* `ch_received_count 40` - received requests count from launch
+* `ch_sent_count 1` - sent request count from launch
+
 
 ### Tips
 
