@@ -31,7 +31,7 @@ func TestDump_Dump(t *testing.T) {
 
 	dumper.Listen(sender, 1)
 	c.Dump("eee", "eee", "", "", 502)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
 	err = dumper.ProcessNextDump(sender)
 	assert.Equal(t, ErrNoDumps, err)
 
