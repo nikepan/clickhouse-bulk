@@ -19,7 +19,7 @@ func TestDump_Dump(t *testing.T) {
 	assert.True(t, c.Empty())
 	buf, _, err := dumper.GetDumpData(dumper.dumpName(1, "", 502))
 	assert.Nil(t, err)
-	assert.Equal(t, "eee\neee\n", string(buf))
+	assert.Equal(t, "eee\neee", string(buf))
 
 	sender := &fakeSender{}
 	err = dumper.ProcessNextDump(sender)
