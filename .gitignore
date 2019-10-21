@@ -30,3 +30,6 @@ dumps
 
 .vscode
 .idea/
+clickhouse-bulk
+debug
+check.py
