@@ -16,13 +16,14 @@ import (
 )
 
 const defaultDumpCheckInterval = 30
+const dumpResponseMark = "\n### RESPONSE ###\n"
 
 // ErrNoDumps - signal that dumps not found
 var ErrNoDumps = errors.New("No dumps")
 
 // Dumper - interface for dump data
 type Dumper interface {
-	Dump(params string, data string, prefix string, status int) error
+	Dump(params string, data string, response string, prefix string, status int) error
 }
 
 // FileDumper - dumps data to file system
@@ -61,16 +62,20 @@ func NewDumper(path string) *FileDumper {
 }
 
 // Dump - dumps data to files
-func (d *FileDumper) Dump(params string, data string, prefix string, status int) error {
+func (d *FileDumper) Dump(params string, content string, response string, prefix string, status int) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	err := d.checkDir(true)
 	if err != nil {
 		return err
 	}
+	data := params + "\n" + content
+	if response != "" {
+		data += dumpResponseMark + response
+	}
 	d.DumpNum++
 	err = ioutil.WriteFile(
-		path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status)), []byte(params+"\n"+data), 0644,
+		path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status)), []byte(data), 0644,
 	)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
@@ -112,10 +117,14 @@ func (d *FileDumper) GetDump() (string, error) {
 }
 
 // GetDumpData - get dump data from filesystem
-func (d *FileDumper) GetDumpData(id string) (string, error) {
+func (d *FileDumper) GetDumpData(id string) (data string, response string, err error) {
 	path := d.makePath(id)
 	s, err := ioutil.ReadFile(path)
-	return string(s), err
+	items := strings.Split(string(s), dumpResponseMark)
+	if len(items) > 1 {
+		return items[0], items[1], err
+	}
+	return items[0], "", err
 }
 
 // DeleteDump - get dump data from filesystem
@@ -139,24 +148,23 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	if f == "" {
 		return nil
 	}
-	data, err := d.GetDumpData(f)
+	data, _, err := d.GetDumpData(f)
 	if err != nil {
 		return fmt.Errorf("Dump read error: %+v", err)
 	}
-	if data == "" {
-		return nil
+	if data != "" {
+		params := ""
+		lines := strings.Split(data, "\n")
+		if !HasPrefix(lines[0], "insert") {
+			params = lines[0]
+			data = strings.Join(lines[1:], "\n")
+		}
+		_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data})
+		if err != nil {
+			return fmt.Errorf("server error (%+v) %+v", status, err)
+		}
+		log.Printf("INFO: dump sended: %+v\n", f)
 	}
-	params := ""
-	lines := strings.Split(data, "\n")
-	if !HasPrefix(lines[0], "insert") {
-		params = lines[0]
-		data = strings.Join(lines[1:], "\n")
-	}
-	_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data})
-	if err != nil {
-		return fmt.Errorf("server error (%+v) %+v", status, err)
-	}
-	log.Printf("INFO: dump sended: %+v\n", f)
 	err = d.DeleteDump(f)
 	if err != nil {
 		d.LockedFiles[f] = true
