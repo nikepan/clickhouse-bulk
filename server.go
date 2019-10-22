@@ -2,10 +2,16 @@ package main
 
 import (
 	"context"
-	"github.com/labstack/echo"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/labstack/echo"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server - main server object
@@ -34,7 +40,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 	s := string(q)
 
 	if server.Debug {
-		log.Printf("query %+v %+v\n", c.QueryString(), s)
+		log.Printf("DEBUG: query %+v %+v\n", c.QueryString(), s)
 	}
 
 	qs := c.QueryString()
@@ -51,7 +57,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
-	resp, status := server.Collector.Sender.SendQuery(params, content)
+	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: params, Content: content})
 	return c.String(status, resp)
 }
 
@@ -74,6 +80,63 @@ func InitServer(listen string, collector *Collector, debug bool) *Server {
 	server := NewServer(listen, collector, debug)
 	server.echo.POST("/", server.writeHandler)
 	server.echo.GET("/status", server.statusHandler)
+	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	return server
+}
+
+// SafeQuit - safe prepare to quit
+func SafeQuit(collect *Collector, sender Sender) {
+	collect.FlushAll()
+	if count := sender.Len(); count > 0 {
+		log.Printf("Sending %+v tables\n", count)
+	}
+	for !sender.Empty() && !collect.Empty() {
+		collect.WaitFlush()
+	}
+	collect.WaitFlush()
+}
+
+// RunServer - run all
+func RunServer(cnf Config) {
+	InitMetrics()
+	dumper := NewDumper(cnf.DumpDir)
+	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout)
+	sender.Dumper = dumper
+	for _, url := range cnf.Clickhouse.Servers {
+		sender.AddServer(url)
+	}
+
+	collect := NewCollector(sender, cnf.FlushCount, cnf.FlushInterval)
+
+	// send collected data on SIGTERM and exit
+	signals := make(chan os.Signal)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+	srv := InitServer(cnf.Listen, collect, cnf.Debug)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() {
+		for {
+			_ = <-signals
+			log.Printf("STOP signal\n")
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Printf("Shutdown error %+v\n", err)
+				SafeQuit(collect, sender)
+				os.Exit(1)
+			}
+		}
+	}()
+
+	if cnf.DumpCheckInterval >= 0 {
+		dumper.Listen(sender, cnf.DumpCheckInterval)
+	}
+
+	err := srv.Start()
+	if err != nil {
+		log.Printf("ListenAndServe: %+v\n", err)
+		SafeQuit(collect, sender)
+		os.Exit(1)
+	}
 }

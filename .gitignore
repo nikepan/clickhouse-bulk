@@ -25,6 +25,11 @@ _testmain.go
 *.exe
 *.test
 *.prof
+dumptest
+dumps
 
 .vscode
 .idea/
+clickhouse-bulk
+debug
+check.py

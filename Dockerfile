@@ -1,4 +1,4 @@
-FROM golang:1.12.4 as builder
+FROM golang:1.13.1 as builder
 
 ARG GOPROXY
 ENV GOOS=linux \
@@ -18,6 +18,7 @@ RUN go build -v
 FROM alpine:latest
 RUN apk add ca-certificates
 WORKDIR /app
+RUN mkdir /app/dumps
 COPY --from=builder /go/src/github.com/nikepan/clickhouse-bulk/config.sample.json .
 COPY --from=builder /go/src/github.com/nikepan/clickhouse-bulk/clickhouse-bulk .
 EXPOSE 8123

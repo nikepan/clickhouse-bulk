@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/stretchr/testify/assert"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const qTitle = "INSERT INTO table3 (c1, c2, c3) FORMAT TabSeparated"
@@ -34,7 +35,7 @@ func TestCollector_Push(t *testing.T) {
 	for i := 0; i < 10400; i++ {
 		c.Push(escTitle, qContent)
 	}
-	assert.Equal(t, c.Tables[escTitle].Count, 800)
+	assert.Equal(t, 400, c.Tables[escTitle].GetCount())
 }
 
 func BenchmarkCollector_ParseQuery(b *testing.B) {
@@ -121,12 +122,28 @@ func TestCollector_ParseQuery(t *testing.T) {
 	assert.False(t, insert)
 }
 
+func TestCollector_separateQuery(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000)
+	query, params := c.separateQuery(escParamsAndSelect)
+	assert.Equal(t, qSelect, query)
+	assert.Equal(t, qParams, params)
+}
+
+func TestTable_getFormat(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000)
+	f := c.getFormat(qTitle)
+	assert.Equal(t, "TabSeparated", f)
+}
+
 func TestTable_CheckFlush(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1)
+	c := NewCollector(&fakeSender{}, 1000, 1000)
 	c.Push(qTitle, qContent)
+	count := 0
 	for !c.Tables[qTitle].Empty() {
-		time.Sleep(10)
+		time.Sleep(time.Millisecond * time.Duration(100))
+		count++
 	}
+	assert.True(t, count >= 9)
 }
 
 func TestCollector_FlushAll(t *testing.T) {

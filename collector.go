@@ -8,18 +8,26 @@ import (
 	"time"
 )
 
+const formatValues = "values"
+const formatTabSeparated = "tabseparated"
+
 var regexFormat = regexp.MustCompile("(?i)format\\s\\S+(\\s+)")
 var regexValues = regexp.MustCompile("(?i)\\svalues\\s")
+var regexGetFormat = regexp.MustCompile("(?i)format\\s(\\S+)")
 
 // Table - store query table info
 type Table struct {
 	Name          string
+	Format        string
+	Query         string
+	Params        string
 	Rows          []string
-	Count         int
+	count         int
 	FlushCount    int
 	FlushInterval int
 	mu            sync.Mutex
 	Sender        Sender
+	// todo add Last Error
 }
 
 // Collector - query collector
@@ -53,22 +61,27 @@ func NewCollector(sender Sender, count int, interval int) (c *Collector) {
 
 // Content - get text content of rowsfor query
 func (t *Table) Content() string {
-	return strings.Join(t.Rows, "\n")
+	return t.Query + "\n" + strings.Join(t.Rows, "\n")
 }
 
 // Flush - sends collected data in table to clickhouse
 func (t *Table) Flush() {
-	rows := t.Content()
-	t.Sender.Send(t.Name, rows)
+	req := ClickhouseRequest{
+		Params:  t.Params,
+		Query:   t.Query,
+		Content: t.Content(),
+		Count:   t.count,
+	}
+	t.Sender.Send(&req)
 	t.Rows = make([]string, 0, t.FlushCount)
-	t.Count = 0
+	t.count = 0
 }
 
 // CheckFlush - check if flush is need and sends data to clickhouse
 func (t *Table) CheckFlush() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.Count > 0 {
+	if t.count > 0 {
 		t.Flush()
 		return true
 	}
@@ -77,9 +90,14 @@ func (t *Table) CheckFlush() bool {
 
 // Empty - Checks if table is empty
 func (t *Table) Empty() bool {
+	return t.GetCount() == 0
+}
+
+// GetCount - Checks if table is empty
+func (t *Table) GetCount() int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.Count == 0
+	return t.count
 }
 
 // RunTimer - timer for periodical savings data
@@ -94,10 +112,9 @@ func (t *Table) RunTimer() {
 
 // Add - Adding query to table
 func (t *Table) Add(text string) {
-	count := strings.Count(text, "\n") + 1
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.Count += count
+	t.count++
 	t.Rows = append(t.Rows, text)
 	if len(t.Rows) >= t.FlushCount {
 		t.Flush()
@@ -142,8 +159,40 @@ func (c *Collector) AddTable(name string) {
 	c.addTable(name)
 }
 
+func (c *Collector) separateQuery(name string) (query string, params string) {
+	items := strings.Split(name, "&")
+	for _, p := range items {
+		if HasPrefix(p, "query=") {
+			query = p[6:]
+		} else {
+			params += "&" + p
+		}
+	}
+	if len(params) > 0 {
+		params = strings.TrimSpace(params[1:])
+	}
+	q, err := url.QueryUnescape(query)
+	if err != nil {
+		return "", name
+	}
+	return q, params
+}
+
+func (c *Collector) getFormat(query string) (format string) {
+	format = formatValues
+	f := regexGetFormat.FindSubmatch([]byte(query))
+	if len(f) > 1 {
+		format = strings.TrimSpace(string(f[1]))
+	}
+	return format
+}
+
 func (c *Collector) addTable(name string) *Table {
 	t := NewTable(name, c.Sender, c.Count, c.FlushInterval)
+	query, params := c.separateQuery(name)
+	t.Query = query
+	t.Params = params
+	t.Format = c.getFormat(query)
 	c.Tables[name] = t
 	t.RunTimer()
 	return t
@@ -156,17 +205,18 @@ func (c *Collector) Push(params string, content string) {
 	if ok {
 		table.Add(content)
 		c.mu.RUnlock()
+		pushCounter.Inc()
 		return
 	}
 	c.mu.RUnlock()
 	c.mu.Lock()
 	table, ok = c.Tables[params]
 	if !ok {
-		//log.Printf("'%+v'\n", params)
 		table = c.addTable(params)
 	}
 	table.Add(content)
 	c.mu.Unlock()
+	pushCounter.Inc()
 }
 
 // ParseQuery - parsing inbound query to unified format (params/query), content (query data)
@@ -212,7 +262,7 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 			params = "query=" + url.QueryEscape(q)
 		}
 	}
-	return params, content, insert
+	return strings.TrimSpace(params), strings.TrimSpace(content), insert
 }
 
 // Parse - parsing text for query and data

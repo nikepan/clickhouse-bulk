@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -21,24 +23,37 @@ type ClickhouseServer struct {
 
 // Clickhouse - main clickhouse sender object
 type Clickhouse struct {
-	Servers     []*ClickhouseServer
-	Queue       *queue.Queue
-	mu          sync.Mutex
-	DownTimeout int
-	Dumper      Dumper
-	wg          sync.WaitGroup
+	Servers        []*ClickhouseServer
+	Queue          *queue.Queue
+	mu             sync.Mutex
+	DownTimeout    int
+	ConnectTimeout int
+	Dumper         Dumper
+	wg             sync.WaitGroup
 }
 
 // ClickhouseRequest - request struct for queue
 type ClickhouseRequest struct {
 	Params  string
+	Query   string
 	Content string
+	Count   int
 }
 
+// ErrServerIsDown - signals about server is down
+var ErrServerIsDown = errors.New("server is down")
+
+// ErrNoServers - signals about no working servers
+var ErrNoServers = errors.New("No working clickhouse servers")
+
 // NewClickhouse - get clickhouse object
-func NewClickhouse(downTimeout int) (c *Clickhouse) {
+func NewClickhouse(downTimeout int, connectTimeout int) (c *Clickhouse) {
 	c = new(Clickhouse)
 	c.DownTimeout = downTimeout
+	c.ConnectTimeout = connectTimeout
+	if c.ConnectTimeout > 0 {
+		c.ConnectTimeout = 10
+	}
 	c.Servers = make([]*ClickhouseServer, 0)
 	c.Queue = queue.New(1000)
 	go c.Run()
@@ -49,7 +64,26 @@ func NewClickhouse(downTimeout int) (c *Clickhouse) {
 func (c *Clickhouse) AddServer(url string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{}})
+	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
+		Timeout: time.Second * time.Duration(c.ConnectTimeout),
+	}})
+}
+
+// DumpServers - dump servers state to prometheus
+func (c *Clickhouse) DumpServers() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	good := 0
+	bad := 0
+	for _, s := range c.Servers {
+		if s.Bad {
+			bad++
+		} else {
+			good++
+		}
+	}
+	goodServers.Set(float64(good))
+	badServers.Set(float64(bad))
 }
 
 // GetNextServer - getting next server for request
@@ -81,18 +115,18 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 }
 
 // Send - send request to next server
-func (c *Clickhouse) Send(queryString string, data string) {
-	req := ClickhouseRequest{queryString, data}
+func (c *Clickhouse) Send(r *ClickhouseRequest) {
 	c.wg.Add(1)
-	c.Queue.Put(req)
+	c.Queue.Put(r)
 }
 
 // Dump - save query to file
-func (c *Clickhouse) Dump(params string, data string) error {
+func (c *Clickhouse) Dump(params string, content string, response string, prefix string, status int) error {
+	dumpCounter.Inc()
 	if c.Dumper != nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		return c.Dumper.Dump(params, data)
+		return c.Dumper.Dump(params, content, response, prefix, status)
 	}
 	return nil
 }
@@ -114,12 +148,19 @@ func (c *Clickhouse) Run() {
 	for {
 		datas, err = c.Queue.Poll(1, time.Second*5)
 		if err == nil {
-			data := datas[0].(ClickhouseRequest)
-			resp, status := c.SendQuery(data.Params, data.Content)
-			if status != http.StatusOK {
-				log.Printf("Send ERROR %+v: %+v\n", status, resp)
-				c.Dump(data.Params, data.Content)
+			data := datas[0].(*ClickhouseRequest)
+			resp, status, err := c.SendQuery(data)
+			if err != nil {
+				log.Printf("ERROR: Send (%+v) %+v; response %+v\n", status, err, resp)
+				prefix := "1"
+				if status >= 400 && status < 502 {
+					prefix = "2"
+				}
+				c.Dump(data.Params, data.Content, resp, prefix, status)
+			} else {
+				sentCounter.Inc()
 			}
+			c.DumpServers()
 			c.wg.Done()
 		}
 	}
@@ -132,36 +173,44 @@ func (c *Clickhouse) WaitFlush() (err error) {
 }
 
 // SendQuery - sends query to server and return result
-func (srv *ClickhouseServer) SendQuery(queryString string, data string) (response string, status int) {
+func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	if srv.URL != "" {
-
-		log.Printf("send %+v rows to %+v of %+v\n", strings.Count(data, "\n")+1, srv.URL, queryString)
-
-		resp, err := srv.Client.Post(srv.URL+"?"+queryString, "", strings.NewReader(data))
+		url := srv.URL
+		if r.Params != "" {
+			url += "?" + r.Params
+		}
+		log.Printf("INFO: send %+v rows to %+v of %+v\n", r.Count, url, r.Query)
+		resp, err := srv.Client.Post(url, "", strings.NewReader(r.Content))
 		if err != nil {
 			srv.Bad = true
-			return err.Error(), http.StatusBadGateway
+			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)
-		return s, resp.StatusCode
+		if resp.StatusCode >= 502 {
+			srv.Bad = true
+			err = ErrServerIsDown
+		} else if resp.StatusCode >= 400 {
+			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)
+		}
+		return s, resp.StatusCode, err
 	}
 
-	return "", http.StatusOK
+	return "", http.StatusOK, err
 }
 
 // SendQuery - sends query to server and return result (with server cycle)
-func (c *Clickhouse) SendQuery(queryString string, data string) (response string, status int) {
+func (c *Clickhouse) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	for {
 		s := c.GetNextServer()
 		if s != nil {
-			r, status := s.SendQuery(queryString, data)
-			if status == http.StatusBadGateway {
+			response, status, err = s.SendQuery(r)
+			if errors.Is(err, ErrServerIsDown) {
+				log.Printf("ERROR: server down (%+v): %+v\n", status, response)
 				continue
 			}
-			return r, status
+			return response, status, err
 		}
-		c.Dump(queryString, data)
-		return "No working clickhouse servers", http.StatusBadGateway
+		return response, status, ErrNoServers
 	}
 }
