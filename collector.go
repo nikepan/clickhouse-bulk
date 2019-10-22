@@ -268,7 +268,11 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 // Parse - parsing text for query and data
 func (c *Collector) Parse(text string) (prefix string, content string) {
 	i := strings.Index(text, "FORMAT")
-	if i >= 0 {
+	k := strings.Index(text, "VALUES")
+	if k == -1 {
+		k = strings.Index(text, "values")
+	}
+	if i >= 0 && i < k {
 		w := false
 		off := -1
 		for c := i + 7; c < len(text); c++ {
@@ -285,13 +289,9 @@ func (c *Collector) Parse(text string) (prefix string, content string) {
 			content = text[off:]
 		}
 	} else {
-		i = strings.Index(text, "VALUES")
-		if i == -1 {
-			i = strings.Index(text, "values")
-		}
-		if i >= 0 {
-			prefix = strings.TrimSpace(text[:i+6])
-			content = strings.TrimSpace(text[i+6:])
+		if k >= 0 {
+			prefix = strings.TrimSpace(text[:k+6])
+			content = strings.TrimSpace(text[k+6:])
 		} else {
 			off := regexFormat.FindStringSubmatchIndex(text)
 			if len(off) > 3 {

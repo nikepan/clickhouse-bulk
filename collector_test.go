@@ -23,6 +23,9 @@ var escTitle = url.QueryEscape(qTitle)
 var escSelect = url.QueryEscape(qSelect)
 var escParamsAndSelect = qParams + "&query=" + escSelect
 
+var qFormatInQuotesQuery = "INSERT INTO test (date, args) VALUES"
+var qFormatInQuotesValues = "('2019-06-13', 'query=select%20args%20from%20test%20group%20by%20date%20FORMAT%20JSON')"
+
 func BenchmarkCollector_Push(t *testing.B) {
 	c := NewCollector(&fakeSender{}, 1000, 1000)
 	for i := 0; i < 30000; i++ {
@@ -120,6 +123,16 @@ func TestCollector_ParseQuery(t *testing.T) {
 	params, content, insert = c.ParseQuery(badEscQuery, qValuesTitleUpper+" "+qValuesContent)
 
 	assert.False(t, insert)
+
+	params, content, insert = c.ParseQuery("", qFormatInQuotesQuery+" "+qFormatInQuotesValues)
+	assert.Equal(t, "query="+url.QueryEscape(qFormatInQuotesQuery), params)
+	assert.Equal(t, qFormatInQuotesValues, content)
+	assert.Equal(t, true, insert)
+
+	params, content, insert = c.ParseQuery("query="+url.QueryEscape(qFormatInQuotesQuery+" "+qFormatInQuotesValues), "")
+	assert.Equal(t, "query="+url.QueryEscape(qFormatInQuotesQuery), params)
+	assert.Equal(t, qFormatInQuotesValues, content)
+	assert.Equal(t, true, insert)
 }
 
 func TestCollector_separateQuery(t *testing.T) {
