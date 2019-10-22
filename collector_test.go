@@ -19,12 +19,15 @@ const qParams = "user=user&password=111"
 const qSelectAndParams = "query=" + qSelect + "&" + qParams
 const badEscQuery = "query=INSERT %zdwfr"
 
+const qFormatInQuotesQuery = "INSERT INTO test (date, args) VALUES"
+const qFormatInQuotesValues = "('2019-06-13', 'query=select%20args%20from%20test%20group%20by%20date%20FORMAT%20JSON')"
+
+const qTSNamesTitle = "INSERT INTO table3 (c1, c2, c3) FORMAT TabSeparatedWithNames"
+const qNames = "field1	field2	field3"
+
 var escTitle = url.QueryEscape(qTitle)
 var escSelect = url.QueryEscape(qSelect)
 var escParamsAndSelect = qParams + "&query=" + escSelect
-
-var qFormatInQuotesQuery = "INSERT INTO test (date, args) VALUES"
-var qFormatInQuotesValues = "('2019-06-13', 'query=select%20args%20from%20test%20group%20by%20date%20FORMAT%20JSON')"
 
 func BenchmarkCollector_Push(t *testing.B) {
 	c := NewCollector(&fakeSender{}, 1000, 1000)
