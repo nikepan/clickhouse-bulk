@@ -179,7 +179,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		if r.Params != "" {
 			url += "?" + r.Params
 		}
-		log.Printf("INFO: send %+v rows to %+v of %+v\n", r.Count, url, r.Query)
+		log.Printf("INFO: send %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		resp, err := srv.Client.Post(url, "", strings.NewReader(r.Content))
 		if err != nil {
 			srv.Bad = true
