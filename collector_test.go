@@ -92,6 +92,13 @@ func TestCollector_ParseQuery(t *testing.T) {
 	assert.Equal(t, "", content)
 	assert.Equal(t, false, insert)
 
+	params, content, insert = c.ParseQuery(
+		"",
+		"INSERT INTO test FORMAT JSONEachRow\n{\"field1\":\"some text\", \"bigdecimal\":2.122423232,\"simpleLong\":2113}")
+	assert.Equal(t, "query="+url.QueryEscape("INSERT INTO test FORMAT JSONEachRow"), params)
+	assert.Equal(t, "{\"field1\":\"some text\", \"bigdecimal\":2.122423232,\"simpleLong\":2113}", content)
+	assert.Equal(t, true, insert)
+
 	// todo add support not only UpperCase syntax
 	//params, content, insert = c.ParseQuery("query="+url.QueryEscape(qValuesTitle+" "+qValuesContent), "")
 	//assert.Equal(t, "query="+url.QueryEscape(qValuesTitle), params)
