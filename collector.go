@@ -39,6 +39,15 @@ type Collector struct {
 	Sender        Sender
 }
 
+type FormatType int8
+
+const (
+	Unknown FormatType = iota
+	SqlValues
+	JSONEachRow
+	TabSeparated
+)
+
 // NewTable - default table constructor
 func NewTable(name string, sender Sender, count int, interval int) (t *Table) {
 	t = new(Table)
@@ -263,6 +272,26 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 		}
 	}
 	return strings.TrimSpace(params), strings.TrimSpace(content), insert
+}
+
+func GetInsertFormatType(query string) (format FormatType) {
+	k := strings.Index(query, "VALUES")
+	if k != -1 {
+		return SqlValues
+	}
+	k = strings.Index(query, "FORMAT")
+	if k != -1 {
+		k = k + 7
+		// todo check length
+		formatSubString := strings.TrimLeft(query[k:k+20], "\t \n")
+		if strings.HasPrefix(formatSubString, "JSONEachRow") {
+			return JSONEachRow
+		}
+		if strings.HasPrefix(formatSubString, "TabSeparated") {
+			return TabSeparated
+		}
+	}
+	return Unknown
 }
 
 // Parse - parsing text for query and data
