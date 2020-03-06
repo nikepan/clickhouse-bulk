@@ -61,7 +61,11 @@ func NewCollector(sender Sender, count int, interval int) (c *Collector) {
 
 // Content - get text content of rowsfor query
 func (t *Table) Content() string {
-	return t.Query + "\n" + strings.Join(t.Rows, "\n")
+	rowDelimiter := "\n"
+	if t.Format == "RowBinary" {
+		rowDelimiter = ""
+	}
+	return t.Query + "\n" + strings.Join(t.Rows, rowDelimiter)
 }
 
 // Flush - sends collected data in table to clickhouse
