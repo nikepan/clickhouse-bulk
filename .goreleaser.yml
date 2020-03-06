@@ -20,7 +20,7 @@ builds:
     main: ./
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
-archive:
+archives:
   format_overrides:
     - goos: windows
       format: zip
