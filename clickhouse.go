@@ -51,7 +51,7 @@ func NewClickhouse(downTimeout int, connectTimeout int) (c *Clickhouse) {
 	c = new(Clickhouse)
 	c.DownTimeout = downTimeout
 	c.ConnectTimeout = connectTimeout
-	if c.ConnectTimeout > 0 {
+	if c.ConnectTimeout < 0 {
 		c.ConnectTimeout = 10
 	}
 	c.Servers = make([]*ClickhouseServer, 0)
