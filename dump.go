@@ -43,7 +43,7 @@ func (d *FileDumper) checkDir(create bool) error {
 	_, err := os.Stat(d.Path)
 	if os.IsNotExist(err) {
 		if create {
-			return os.Mkdir(d.Path, 0777)
+			return os.MkdirAll(d.Path + "/bad-requests", 0777)
 		}
 	}
 	return err
@@ -74,9 +74,13 @@ func (d *FileDumper) Dump(params string, content string, response string, prefix
 		data += dumpResponseMark + response
 	}
 	d.DumpNum++
-	err = ioutil.WriteFile(
-		path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status)), []byte(data), 0644,
-	)
+	dumpPath := ""
+	if status == 400 {
+		dumpPath = path.Join(d.Path + "/bad-requests", d.dumpName(d.DumpNum, prefix, status))
+	} else {
+		dumpPath = path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status))
+	}
+	err = ioutil.WriteFile(dumpPath, []byte(data), 0644)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
 	}
