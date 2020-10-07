@@ -74,7 +74,7 @@ func (t *Table) Flush() {
 		Params:  t.Params,
 		Query:   t.Query,
 		Content: t.Content(),
-		Count:   t.count,
+		Count:   len(t.Rows),
 	}
 	t.Sender.Send(&req)
 	t.Rows = make([]string, 0, t.FlushCount)
@@ -119,7 +119,12 @@ func (t *Table) Add(text string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.count++
-	t.Rows = append(t.Rows, text)
+    if t.Format != "RowBinary" {
+        //textSplitted := strings.Split(text, "\n")
+	    t.Rows = append(t.Rows, strings.Split(text, "\n")...)
+    } else {
+	    t.Rows = append(t.Rows, text)
+    }
 	if len(t.Rows) >= t.FlushCount {
 		t.Flush()
 	}

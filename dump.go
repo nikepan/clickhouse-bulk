@@ -159,11 +159,11 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 			params = lines[0]
 			data = strings.Join(lines[1:], "\n")
 		}
-		_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data})
+        _, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data, Count: len(lines[1:])})
 		if err != nil {
 			return fmt.Errorf("server error (%+v) %+v", status, err)
 		}
-		log.Printf("INFO: dump sended: %+v\n", f)
+		log.Printf("INFO: dump sent: %+v\n", f)
 	}
 	err = d.DeleteDump(f)
 	if err != nil {
