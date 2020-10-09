@@ -12,7 +12,7 @@ var date = "unknown"
 func main() {
 
 	log.SetOutput(os.Stdout)
-    log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
 	configFile := flag.String("config", "config.json", "config file (json)")
 

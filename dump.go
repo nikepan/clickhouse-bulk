@@ -154,14 +154,14 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	}
 	if data != "" {
 		params := ""
-        query := ""
+		query := ""
 		lines := strings.Split(data, "\n")
 		if !HasPrefix(lines[0], "insert") {
 			params = lines[0]
-            query = lines[1]
+			query = lines[1]
 			data = strings.Join(lines[1:], "\n")
 		}
-        _, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data, Query: query, Count: len(lines[2:]), isInsert: true})
+		_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data, Query: query, Count: len(lines[2:]), isInsert: true})
 		if err != nil {
 			return fmt.Errorf("server error (%+v) %+v", status, err)
 		}
