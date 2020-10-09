@@ -57,7 +57,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
-	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s})
+    resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, isInsert: false})
 	return c.String(status, resp)
 }
 

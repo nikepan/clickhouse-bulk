@@ -34,10 +34,11 @@ type Clickhouse struct {
 
 // ClickhouseRequest - request struct for queue
 type ClickhouseRequest struct {
-	Params  string
-	Query   string
-	Content string
-	Count   int
+	Params      string
+	Query       string
+	Content     string
+	Count       int
+	isInsert    bool
 }
 
 // ErrServerIsDown - signals about server is down
@@ -179,13 +180,17 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		if r.Params != "" {
 			url += "?" + r.Params
 		}
-		log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+        if r.isInsert {
+		    log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+        }
 		resp, err := srv.Client.Post(url, "", strings.NewReader(r.Content))
 		if err != nil {
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		} else {
-            log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+            if r.isInsert {
+                log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+            }
         }
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)

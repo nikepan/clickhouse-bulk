@@ -71,10 +71,11 @@ func (t *Table) Content() string {
 // Flush - sends collected data in table to clickhouse
 func (t *Table) Flush() {
 	req := ClickhouseRequest{
-		Params:  t.Params,
-		Query:   t.Query,
-		Content: t.Content(),
-		Count:   len(t.Rows),
+		Params:     t.Params,
+		Query:      t.Query,
+		Content:    t.Content(),
+		Count:      len(t.Rows),
+        isInsert:   true,
 	}
 	t.Sender.Send(&req)
 	t.Rows = make([]string, 0, t.FlushCount)
@@ -120,7 +121,6 @@ func (t *Table) Add(text string) {
 	defer t.mu.Unlock()
 	t.count++
     if t.Format != "RowBinary" {
-        //textSplitted := strings.Split(text, "\n")
 	    t.Rows = append(t.Rows, strings.Split(text, "\n")...)
     } else {
 	    t.Rows = append(t.Rows, text)
