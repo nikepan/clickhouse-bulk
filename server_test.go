@@ -18,7 +18,7 @@ import (
 )
 
 func TestRunServer(t *testing.T) {
-	collector := NewCollector(&fakeSender{}, 1000, 1000)
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	server := InitServer("", collector, false)
 	go server.Start()
 	server.echo.POST("/", server.writeHandler)
@@ -58,7 +58,7 @@ func TestRunServer(t *testing.T) {
 
 func TestServer_SafeQuit(t *testing.T) {
 	sender := &fakeSender{}
-	collect := NewCollector(sender, 1000, 1000)
+	collect := NewCollector(sender, 1000, 1000, 0, true)
 	collect.AddTable("test")
 	collect.Push("sss", "sss")
 
@@ -96,7 +96,7 @@ func TestServer_MultiServer(t *testing.T) {
 	sender := NewClickhouse(10, 10)
 	sender.AddServer(s1.URL)
 	sender.AddServer(s2.URL)
-	collect := NewCollector(sender, 1000, 1000)
+	collect := NewCollector(sender, 1000, 1000, 0, true)
 	collect.AddTable("test")
 	collect.Push("eee", "eee")
 	collect.Push("fff", "fff")

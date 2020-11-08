@@ -10,6 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	// debug stuff
+	_ "net/http/pprof"
+	"runtime"
+	"runtime/debug"
+
 	"github.com/labstack/echo"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -65,6 +70,30 @@ func (server *Server) statusHandler(c echo.Context) error {
 	return c.JSON(200, Status{Status: "ok"})
 }
 
+func (server *Server) gcHandler(c echo.Context) error {
+	runtime.GC()
+	return c.JSON(200, Status{Status: "GC"})
+}
+
+func (server *Server) freeMemHandler(c echo.Context) error {
+	debug.FreeOSMemory()
+	return c.JSON(200, Status{Status: "freeMem"})
+}
+
+// manual trigger for cleaning tables
+func (server *Server) tablesCleanHandler(c echo.Context) error {
+	log.Printf("DEBUG: clean tables:\n%+v", server.Collector.Tables)
+	for k, t := range server.Collector.Tables {
+		log.Printf("DEBUG: check if table is empty: %+v with key:%+v\n", t, k)
+		if ok := t.Empty(); ok {
+			log.Printf("DEBUG: delete empty table: %+v with key:%+v\n", t, k)
+			server.Collector.Tables[k].CleanTable()
+			defer delete(server.Collector.Tables, k)
+		}
+	}
+	return c.JSON(200, Status{Status: "cleaned empty tables"})
+}
+
 // Start - start http server
 func (server *Server) Start() error {
 	return server.echo.Start(server.Listen)
@@ -81,6 +110,11 @@ func InitServer(listen string, collector *Collector, debug bool) *Server {
 	server.echo.POST("/", server.writeHandler)
 	server.echo.GET("/status", server.statusHandler)
 	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+	// debug stuff
+	server.echo.GET("/debug/gc", server.gcHandler)
+	server.echo.GET("/debug/freemem", server.freeMemHandler)
+	server.echo.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+	server.echo.GET("/debug/tables-clean", server.tablesCleanHandler)
 
 	return server
 }
@@ -107,7 +141,7 @@ func RunServer(cnf Config) {
 		sender.AddServer(url)
 	}
 
-	collect := NewCollector(sender, cnf.FlushCount, cnf.FlushInterval)
+	collect := NewCollector(sender, cnf.FlushCount, cnf.FlushInterval, cnf.CleanInterval, cnf.RemoveQueryID)
 
 	// send collected data on SIGTERM and exit
 	signals := make(chan os.Signal)

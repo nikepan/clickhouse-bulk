@@ -27,6 +27,8 @@ type Table struct {
 	FlushInterval int
 	mu            sync.Mutex
 	Sender        Sender
+	TickerChan    *chan struct{}
+	lastUpdate    time.Time
 	// todo add Last Error
 }
 
@@ -36,7 +38,10 @@ type Collector struct {
 	mu            sync.RWMutex
 	Count         int
 	FlushInterval int
+	CleanInterval int
+	RemoveQueryID bool
 	Sender        Sender
+	TickerChan    *chan struct{}
 }
 
 // NewTable - default table constructor
@@ -50,12 +55,17 @@ func NewTable(name string, sender Sender, count int, interval int) (t *Table) {
 }
 
 // NewCollector - default collector constructor
-func NewCollector(sender Sender, count int, interval int) (c *Collector) {
+func NewCollector(sender Sender, count int, interval int, cleanInterval int, removeQueryID bool) (c *Collector) {
 	c = new(Collector)
 	c.Sender = sender
 	c.Tables = make(map[string]*Table)
 	c.Count = count
 	c.FlushInterval = interval
+	c.CleanInterval = cleanInterval
+	c.RemoveQueryID = removeQueryID
+	if cleanInterval > 0 {
+		c.TickerChan = c.RunTimer()
+	}
 	return c
 }
 
@@ -106,13 +116,21 @@ func (t *Table) GetCount() int {
 }
 
 // RunTimer - timer for periodical savings data
-func (t *Table) RunTimer() {
-	ticker := time.NewTicker(time.Millisecond * time.Duration(t.FlushInterval))
+func (t *Table) RunTimer() *chan struct{} {
+	done := make(chan struct{})
 	go func() {
-		for range ticker.C {
-			t.CheckFlush()
+		ticker := time.NewTicker(time.Millisecond * time.Duration(t.FlushInterval))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				t.CheckFlush()
+			case <-done:
+				return
+			}
 		}
 	}()
+	return &done
 }
 
 // Add - Adding query to table
@@ -120,7 +138,7 @@ func (t *Table) Add(text string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.count++
-	if t.Format != "RowBinary" {
+	if t.Format == "TabSeparated" {
 		t.Rows = append(t.Rows, strings.Split(text, "\n")...)
 	} else {
 		t.Rows = append(t.Rows, text)
@@ -128,6 +146,46 @@ func (t *Table) Add(text string) {
 	if len(t.Rows) >= t.FlushCount {
 		t.Flush()
 	}
+	t.lastUpdate = time.Now()
+}
+
+// CleanTable - delete table from map
+func (t *Table) CleanTable() {
+	t.mu.Lock()
+	close(*t.TickerChan)
+	t = nil
+}
+
+// CleanTables - clean unsused tables
+func (c *Collector) CleanTables() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k, t := range c.Tables {
+		if t.lastUpdate.Add(time.Duration(c.CleanInterval) * time.Millisecond).Before(time.Now()) {
+			// table was not updated for CleanInterval - delete that table - otherwise it can cause memLeak
+			t.CleanTable()
+			defer delete(c.Tables, k)
+		}
+
+	}
+}
+
+// RunTimer - timer for periodical cleaning unused tables
+func (c *Collector) RunTimer() *chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(time.Duration(c.CleanInterval) * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.CleanTables()
+			case <-done:
+				return
+			}
+		}
+	}()
+	return &done
 }
 
 // Empty - check if all tables are empty
@@ -203,12 +261,29 @@ func (c *Collector) addTable(name string) *Table {
 	t.Params = params
 	t.Format = c.getFormat(query)
 	c.Tables[name] = t
-	t.RunTimer()
+	t.TickerChan = t.RunTimer()
+	t.lastUpdate = time.Now()
 	return t
 }
 
 // Push - adding query to collector with query params (with query) and rows
-func (c *Collector) Push(params string, content string) {
+func (c *Collector) Push(paramsIn string, content string) {
+	// as we are using all params a table key, we have to remove query_id
+	params := ""
+	if c.RemoveQueryID {
+		items := strings.Split(paramsIn, "&")
+		for _, p := range items {
+			if !HasPrefix(p, "query_id=") {
+				//params = strings.ReplaceAll(params, p, "")
+				params += "&" + p
+			}
+		}
+		if len(params) > 0 {
+			params = strings.TrimSpace(params[1:])
+		}
+	} else {
+		params = paramsIn
+	}
 	c.mu.RLock()
 	table, ok := c.Tables[params]
 	if ok {
