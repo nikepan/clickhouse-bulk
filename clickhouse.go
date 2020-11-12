@@ -218,6 +218,6 @@ func (c *Clickhouse) SendQuery(r *ClickhouseRequest) (response string, status in
 			}
 			return response, status, err
 		}
-		return response, status, ErrNoServers
+		return "", http.StatusServiceUnavailable, ErrNoServers
 	}
 }
