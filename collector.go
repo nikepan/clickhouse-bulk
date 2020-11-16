@@ -268,13 +268,13 @@ func (c *Collector) addTable(name string) *Table {
 
 // Push - adding query to collector with query params (with query) and rows
 func (c *Collector) Push(paramsIn string, content string) {
-	// as we are using all params a table key, we have to remove query_id
+	// as we are using all params as a table key, we have to remove query_id
+	// otherwise every query will be threated as unique thus it will consume more memory
 	params := ""
 	if c.RemoveQueryID {
 		items := strings.Split(paramsIn, "&")
 		for _, p := range items {
 			if !HasPrefix(p, "query_id=") {
-				//params = strings.ReplaceAll(params, p, "")
 				params += "&" + p
 			}
 		}
