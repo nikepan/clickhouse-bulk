@@ -43,7 +43,7 @@ func TestClickhouse_SendQuery(t *testing.T) {
 	c.GetNextServer()
 	c.Servers[0].Bad = true
 	_, status, err := c.SendQuery(&ClickhouseRequest{})
-	assert.Equal(t, 0, status)
+	assert.Equal(t, 503, status)
 	assert.True(t, errors.Is(err, ErrNoServers))
 }
 

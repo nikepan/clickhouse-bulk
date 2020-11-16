@@ -22,6 +22,8 @@ type Config struct {
 	Clickhouse        clickhouseConfig `json:"clickhouse"`
 	FlushCount        int              `json:"flush_count"`
 	FlushInterval     int              `json:"flush_interval"`
+	CleanInterval     int              `json:"clean_interval"`
+	RemoveQueryID     bool             `json:"remove_query_id"`
 	DumpCheckInterval int              `json:"dump_check_interval"`
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
@@ -54,6 +56,17 @@ func readEnvInt(name string, value *int) {
 	}
 }
 
+func readEnvBool(name string, value *bool) {
+	s := os.Getenv(name)
+	if s != "" {
+		v, err := strconv.ParseBool(s)
+		if err != nil {
+			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		}
+		*value = v
+	}
+}
+
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {
 	cnf := Config{}
@@ -66,8 +79,11 @@ func ReadConfig(configFile string) (Config, error) {
 		}
 	}
 
+	readEnvBool("CLICKHOUSE_BULK_DEBUG", &cnf.Debug)
 	readEnvInt("CLICKHOUSE_FLUSH_COUNT", &cnf.FlushCount)
 	readEnvInt("CLICKHOUSE_FLUSH_INTERVAL", &cnf.FlushInterval)
+	readEnvInt("CLICKHOUSE_CLEAN_INTERVAL", &cnf.CleanInterval)
+	readEnvBool("CLICKHOUSE_REMOVE_QUERY_ID", &cnf.RemoveQueryID)
 	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
 	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)

@@ -30,14 +30,14 @@ var escSelect = url.QueryEscape(qSelect)
 var escParamsAndSelect = qParams + "&query=" + escSelect
 
 func BenchmarkCollector_Push(t *testing.B) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	for i := 0; i < 30000; i++ {
 		c.Push(escTitle, qContent)
 	}
 }
 
 func TestCollector_Push(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	for i := 0; i < 10400; i++ {
 		c.Push(escTitle, qContent)
 	}
@@ -45,7 +45,7 @@ func TestCollector_Push(t *testing.T) {
 }
 
 func BenchmarkCollector_ParseQuery(b *testing.B) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	c.ParseQuery("", qTitle+" "+qContent)
 	c.ParseQuery(qParams, qTitle+" "+qContent)
 	c.ParseQuery("query="+escTitle, qContent)
@@ -53,7 +53,7 @@ func BenchmarkCollector_ParseQuery(b *testing.B) {
 }
 
 func TestCollector_ParseQuery(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	var params string
 	var content string
 	var insert bool
@@ -139,20 +139,20 @@ func TestCollector_ParseQuery(t *testing.T) {
 }
 
 func TestCollector_separateQuery(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	query, params := c.separateQuery(escParamsAndSelect)
 	assert.Equal(t, qSelect, query)
 	assert.Equal(t, qParams, params)
 }
 
 func TestTable_getFormat(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	f := c.getFormat(qTitle)
 	assert.Equal(t, "TabSeparated", f)
 }
 
 func TestTable_CheckFlush(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	c.Push(qTitle, qContent)
 	count := 0
 	for !c.Tables[qTitle].Empty() {
@@ -163,7 +163,7 @@ func TestTable_CheckFlush(t *testing.T) {
 }
 
 func TestCollector_FlushAll(t *testing.T) {
-	c := NewCollector(&fakeSender{}, 1000, 1000)
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	c.Push(qTitle, qContent)
 	c.FlushAll()
 }
