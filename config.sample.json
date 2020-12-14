@@ -10,6 +10,8 @@
   "clickhouse": {
     "down_timeout": 60,
     "connect_timeout": 10,
+    "tls_server_name": "",
+    "insecure_tls_skip_verify": false,
     "servers": [
       "http://127.0.0.1:8123"
     ]

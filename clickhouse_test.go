@@ -10,7 +10,7 @@ import (
 )
 
 func TestClickhouse_GetNextServer(t *testing.T) {
-	c := NewClickhouse(300, 10)
+	c := NewClickhouse(300, 10, "", false)
 	c.AddServer("")
 	c.AddServer("http://127.0.0.1:8124")
 	c.AddServer("http://127.0.0.1:8125")
@@ -29,7 +29,7 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 }
 
 func TestClickhouse_Send(t *testing.T) {
-	c := NewClickhouse(300, 10)
+	c := NewClickhouse(300, 10, "", false)
 	c.AddServer("")
 	c.Send(&ClickhouseRequest{})
 	for !c.Queue.Empty() {
@@ -38,7 +38,7 @@ func TestClickhouse_Send(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery(t *testing.T) {
-	c := NewClickhouse(300, 10)
+	c := NewClickhouse(300, 10, "", false)
 	c.AddServer("")
 	c.GetNextServer()
 	c.Servers[0].Bad = true
@@ -48,7 +48,7 @@ func TestClickhouse_SendQuery(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery1(t *testing.T) {
-	c := NewClickhouse(-1, 10)
+	c := NewClickhouse(-1, 10, "", false)
 	c.AddServer("")
 	c.GetNextServer()
 	c.Servers[0].Bad = true

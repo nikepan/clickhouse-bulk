@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -30,6 +31,7 @@ type Clickhouse struct {
 	ConnectTimeout int
 	Dumper         Dumper
 	wg             sync.WaitGroup
+	Transport      *http.Transport
 }
 
 // ClickhouseRequest - request struct for queue
@@ -48,7 +50,15 @@ var ErrServerIsDown = errors.New("server is down")
 var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
-func NewClickhouse(downTimeout int, connectTimeout int) (c *Clickhouse) {
+func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
+	tlsConfig := &tls.Config{}
+	if tlsServerName != "" {
+		tlsConfig.ServerName = tlsServerName
+	}
+	if tlsSkipVerify == true {
+		tlsConfig.InsecureSkipVerify = tlsSkipVerify
+	}
+
 	c = new(Clickhouse)
 	c.DownTimeout = downTimeout
 	c.ConnectTimeout = connectTimeout
@@ -57,6 +67,9 @@ func NewClickhouse(downTimeout int, connectTimeout int) (c *Clickhouse) {
 	}
 	c.Servers = make([]*ClickhouseServer, 0)
 	c.Queue = queue.New(1000)
+	c.Transport = &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
 	go c.Run()
 	return c
 }
@@ -66,7 +79,7 @@ func (c *Clickhouse) AddServer(url string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
-		Timeout: time.Second * time.Duration(c.ConnectTimeout),
+		Timeout: time.Second * time.Duration(c.ConnectTimeout), Transport: c.Transport,
 	}})
 }
 
