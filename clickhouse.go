@@ -187,10 +187,9 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		if err != nil {
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
-		} else {
-			if r.isInsert {
-				log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
-			}
+		}
+		if r.isInsert {
+			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		}
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)
