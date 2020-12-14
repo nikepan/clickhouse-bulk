@@ -59,6 +59,10 @@ func (server *Server) writeHandler(c echo.Context) error {
 	}
 	params, content, insert := server.Collector.ParseQuery(qs, s)
 	if insert {
+		if len(content) == 0 {
+			log.Printf("INFO: empty insert params: [%+v] content: [%+v]\n", params, content)
+			return c.String(http.StatusInternalServerError, "Empty insert\n")
+		}
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}

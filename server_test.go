@@ -35,6 +35,10 @@ func TestRunServer(t *testing.T) {
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
 
+	status, resp = request("POST", "/?query="+escTitle, "", server.echo)
+	assert.Equal(t, status, http.StatusInternalServerError)
+	assert.Equal(t, resp, "Empty insert\n")
+
 	status, resp = authRequest("POST", "default", "", "/?query="+escTitle, qContent, server.echo)
 	assert.Equal(t, status, http.StatusOK)
 	assert.Equal(t, resp, "")
