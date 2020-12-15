@@ -55,6 +55,14 @@ func TestRunServer(t *testing.T) {
 	status, _ = request("GET", "/metrics", "", server.echo)
 	assert.Equal(t, status, http.StatusOK)
 
+	server.echo.GET("/debug/gc", server.gcHandler)
+	status, resp = request("GET", "/debug/gc", "", server.echo)
+	assert.Equal(t, status, http.StatusOK)
+
+	server.echo.GET("/debug/freemem", server.freeMemHandler)
+	status, resp = request("GET", "/debug/freemem", "", server.echo)
+	assert.Equal(t, status, http.StatusOK)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	server.Shutdown(ctx)
@@ -97,7 +105,7 @@ func TestServer_MultiServer(t *testing.T) {
 	}))
 	defer s2.Close()
 
-	sender := NewClickhouse(10, 10)
+	sender := NewClickhouse(10, 10, "", false)
 	sender.AddServer(s1.URL)
 	sender.AddServer(s2.URL)
 	collect := NewCollector(sender, 1000, 1000, 0, true)
