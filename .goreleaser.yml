@@ -14,7 +14,7 @@ builds:
       - linux
     goarch: &goarch
       - amd64
-      - i386
+      - 386
     env:
       - CGO_ENABLED=0
     main: ./
