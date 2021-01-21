@@ -74,11 +74,16 @@ func ReadConfig(configFile string) (Config, error) {
 	cnf := Config{}
 	err := ReadJSON(configFile, &cnf)
 	if err != nil {
-		log.Printf("INFO: Config file %+v not found. Used%+v\n", configFile, sampleConfig)
+		if os.IsNotExist(err) {
+			log.Printf("INFO: Config file %s not found. Loading %s\n", configFile, sampleConfig)
+		} else {
+			log.Printf("INFO: Error loading config file %s: %v. Loading %s\n", configFile, err, sampleConfig)
+		}
 		err = ReadJSON(sampleConfig, &cnf)
 		if err != nil {
-			log.Printf("ERROR: read %+v failed\n", sampleConfig)
+			log.Printf("ERROR: read %s failed\n", sampleConfig)
 		}
+		return cnf, err
 	}
 
 	readEnvBool("CLICKHOUSE_BULK_DEBUG", &cnf.Debug)
@@ -102,5 +107,5 @@ func ReadConfig(configFile string) (Config, error) {
 		cnf.Clickhouse.tlsServerName = tlsServerName
 	}
 
-	return cnf, err
+	return cnf, nil
 }
