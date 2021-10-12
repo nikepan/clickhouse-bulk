@@ -137,7 +137,7 @@ func SafeQuit(collect *Collector, sender Sender) {
 
 // RunServer - run all
 func RunServer(cnf Config) {
-	InitMetrics()
+	InitMetrics(cnf.MetricsPrefix)
 	dumper := NewDumper(cnf.DumpDir)
 	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.tlsServerName, cnf.Clickhouse.tlsSkipVerify)
 	sender.Dumper = dumper

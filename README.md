@@ -71,7 +71,8 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
     "servers": [
       "http://127.0.0.1:8123"
     ]
-  }
+  },
+  "metrics_prefix": "prefix"
 }
 ```
 
@@ -87,6 +88,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 * `CLICKHOUSE_CONNECT_TIMEOUT` - clickhouse server connect timeout  
 * `CLICKHOUSE_TLS_SERVER_NAME` - server name for TLS certificate verification
 * `CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY` - skip certificate verification at all
+* `METRICS_PREFIX` - prefix for prometheus metrics
 
 ### Quickstart
 

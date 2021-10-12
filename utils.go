@@ -29,6 +29,7 @@ type Config struct {
 	DumpCheckInterval int              `json:"dump_check_interval"`
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
+	MetricsPrefix     string           `json:"metrics_prefix"`
 }
 
 // ReadJSON - read json file to struct
@@ -69,6 +70,13 @@ func readEnvBool(name string, value *bool) {
 	}
 }
 
+func readEnvString(name string, value *string) {
+	s := os.Getenv(name)
+	if s != "" {
+		*value = s
+	}
+}
+
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {
 	cnf := Config{}
@@ -90,6 +98,7 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
 	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.tlsSkipVerify)
+	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
 
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")
 	if serversList != "" {
