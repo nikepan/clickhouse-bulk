@@ -37,7 +37,8 @@ var queuedDumps = prometheus.NewGauge(
 	})
 
 // InitMetrics - init prometheus metrics
-func InitMetrics() {
+func InitMetrics(prefix string) {
+	prometheus.DefaultRegisterer = prometheus.WrapRegistererWithPrefix(prefix, prometheus.DefaultRegisterer)
 
 	prometheus.MustRegister(pushCounter)
 	prometheus.MustRegister(sentCounter)
