@@ -18,9 +18,10 @@ import (
 )
 
 func TestRunServer(t *testing.T) {
+	cnf, _ := ReadConfig("wrong_config.json")
 	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	server := InitServer("", collector, false)
-	go server.Start()
+	go server.Start(cnf)
 	server.echo.POST("/", server.writeHandler)
 
 	status, resp := request("POST", "/", "", server.echo)
