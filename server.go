@@ -99,8 +99,12 @@ func (server *Server) tablesCleanHandler(c echo.Context) error {
 }
 
 // Start - start http server
-func (server *Server) Start() error {
-	return server.echo.Start(server.Listen)
+func (server *Server) Start(cnf Config) error {
+	if cnf.UseTLS {
+		return server.echo.StartTLS(server.Listen, cnf.TLSCertFile, cnf.TLSKeyFile)
+	} else {
+		return server.echo.Start(server.Listen)
+	}
 }
 
 // Shutdown - stop http server
@@ -171,7 +175,7 @@ func RunServer(cnf Config) {
 		dumper.Listen(sender, cnf.DumpCheckInterval)
 	}
 
-	err := srv.Start()
+	err := srv.Start(cnf)
 	if err != nil {
 		log.Printf("ListenAndServe: %+v\n", err)
 		SafeQuit(collect, sender)

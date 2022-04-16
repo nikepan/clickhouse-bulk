@@ -15,5 +15,8 @@
     "servers": [
       "http://127.0.0.1:8123"
     ]
-  }
+  },
+  "use_tls": false,
+  "tls_cert_file": "",
+  "tls_key_file": ""
 }

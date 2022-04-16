@@ -30,6 +30,9 @@ type Config struct {
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
+	UseTLS            bool             `json:"use_tls"`
+	TLSCertFile				string           `json:"tls_cert_file"`
+	TLSKeyFile				string           `json:"tls_key_file"`
 }
 
 // ReadJSON - read json file to struct
