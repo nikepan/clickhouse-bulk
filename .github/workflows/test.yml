@@ -1,4 +1,4 @@
-name: Test
+name: build
 
 on:
   push:
@@ -23,10 +23,10 @@ jobs:
 
     - name: Test
       run: go test -v ./...
-      
+
     - name: Coverage
       run: go test -v -race -covermode=atomic -coverprofile=coverage.out
-      
+
     - name: Upload coverage report
       uses: codecov/codecov-action@v2
       with:
