@@ -1,6 +1,6 @@
 # ClickHouse-Bulk
 
-[![Build Status](https://travis-ci.org/nikepan/clickhouse-bulk.svg?branch=master)](https://travis-ci.org/nikepan/clickhouse-bulk)
+[![build](https://github.com/nikepan/clickhouse-bulk/actions/workflows/test.yml/badge.svg)](https://github.com/nikepan/clickhouse-bulk/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/nikepan/clickhouse-bulk/branch/master/graph/badge.svg)](https://codecov.io/gh/nikepan/clickhouse-bulk)
 [![download binaries](https://img.shields.io/badge/binaries-download-blue.svg)](https://github.com/nikepan/clickhouse-bulk/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nikepan/clickhouse-bulk)](https://goreportcard.com/report/github.com/nikepan/clickhouse-bulk)
@@ -83,9 +83,9 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 * `CLICKHOUSE_FLUSH_COUNT` - count of rows for insert
 * `CLICKHOUSE_FLUSH_INTERVAL` - insert interval
 * `CLICKHOUSE_CLEAN_INTERVAL` - internal tables clean interval
-* `DUMP_CHECK_INTERVAL` - interval of resend dumps  
-* `CLICKHOUSE_DOWN_TIMEOUT` - wait time if server is down  
-* `CLICKHOUSE_CONNECT_TIMEOUT` - clickhouse server connect timeout  
+* `DUMP_CHECK_INTERVAL` - interval of resend dumps
+* `CLICKHOUSE_DOWN_TIMEOUT` - wait time if server is down
+* `CLICKHOUSE_CONNECT_TIMEOUT` - clickhouse server connect timeout
 * `CLICKHOUSE_TLS_SERVER_NAME` - server name for TLS certificate verification
 * `CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY` - skip certificate verification at all
 * `METRICS_PREFIX` - prefix for prometheus metrics
