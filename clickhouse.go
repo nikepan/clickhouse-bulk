@@ -201,6 +201,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
+		defer resp.Body.Close()
 		if r.isInsert {
 			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		}
