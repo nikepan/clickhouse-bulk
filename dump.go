@@ -74,11 +74,12 @@ func (d *FileDumper) Dump(params string, content string, response string, prefix
 		data += dumpResponseMark + response
 	}
 	d.DumpNum++
-	err = ioutil.WriteFile(
-		path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status)), []byte(data), 0644,
-	)
+	file_path := path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status))
+	err = ioutil.WriteFile(file_path, []byte(data), 0644)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
+	} else {
+		log.Printf("SUCCESS: dump to file: %+v\n", file_path)
 	}
 	return err
 }
