@@ -11,10 +11,10 @@ import (
 
 func TestClickhouse_GetNextServer(t *testing.T) {
 	c := NewClickhouse(300, 10, "", false)
-	c.AddServer("")
-	c.AddServer("http://127.0.0.1:8124")
-	c.AddServer("http://127.0.0.1:8125")
-	c.AddServer("http://127.0.0.1:8123")
+	c.AddServer("", true)
+	c.AddServer("http://127.0.0.1:8124", true)
+	c.AddServer("http://127.0.0.1:8125", true)
+	c.AddServer("http://127.0.0.1:8123", true)
 	s := c.GetNextServer()
 	assert.Equal(t, "", s.URL)
 	s.SendQuery(&ClickhouseRequest{})
@@ -30,7 +30,7 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 
 func TestClickhouse_Send(t *testing.T) {
 	c := NewClickhouse(300, 10, "", false)
-	c.AddServer("")
+	c.AddServer("", true)
 	c.Send(&ClickhouseRequest{})
 	for !c.Queue.Empty() {
 		time.Sleep(10)
@@ -39,7 +39,7 @@ func TestClickhouse_Send(t *testing.T) {
 
 func TestClickhouse_SendQuery(t *testing.T) {
 	c := NewClickhouse(300, 10, "", false)
-	c.AddServer("")
+	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].Bad = true
 	_, status, err := c.SendQuery(&ClickhouseRequest{})
@@ -49,7 +49,7 @@ func TestClickhouse_SendQuery(t *testing.T) {
 
 func TestClickhouse_SendQuery1(t *testing.T) {
 	c := NewClickhouse(-1, 10, "", false)
-	c.AddServer("")
+	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].Bad = true
 	s := c.GetNextServer()

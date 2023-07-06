@@ -14,7 +14,7 @@ func TestDump_Dump(t *testing.T) {
 	dumpDir := "dumptest"
 	dumper := NewDumper(dumpDir)
 	c.Dumper = dumper
-	c.AddServer("")
+	c.AddServer("", true)
 	c.Dump("eee", "eee", "error", "", 502)
 	assert.True(t, c.Empty())
 	buf, _, err := dumper.GetDumpData(dumper.dumpName(1, "", 502))

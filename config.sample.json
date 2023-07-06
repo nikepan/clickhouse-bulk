@@ -6,6 +6,7 @@
   "remove_query_id": true,
   "dump_check_interval": 300,
   "debug": false,
+  "log_queries": true,
   "dump_dir": "dumps",
   "clickhouse": {
     "down_timeout": 60,
