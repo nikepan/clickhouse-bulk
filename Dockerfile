@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.20.4 as builder
 
 ARG GOPROXY
 ENV GOOS=linux \

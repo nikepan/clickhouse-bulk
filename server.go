@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"runtime/debug"
 
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
