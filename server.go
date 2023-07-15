@@ -21,10 +21,11 @@ import (
 
 // Server - main server object
 type Server struct {
-	Listen    string
-	Collector *Collector
-	Debug     bool
-	echo      *echo.Echo
+	Listen     string
+	Collector  *Collector
+	Debug      bool
+	LogQueries bool
+	echo       *echo.Echo
 }
 
 // Status - response status struct
@@ -36,8 +37,8 @@ type Status struct {
 }
 
 // NewServer - create server
-func NewServer(listen string, collector *Collector, debug bool) *Server {
-	return &Server{listen, collector, debug, echo.New()}
+func NewServer(listen string, collector *Collector, debug bool, logQueries bool) *Server {
+	return &Server{listen, collector, debug, logQueries, echo.New()}
 }
 
 func (server *Server) writeHandler(c echo.Context) error {
@@ -113,8 +114,8 @@ func (server *Server) Shutdown(ctx context.Context) error {
 }
 
 // InitServer - run server
-func InitServer(listen string, collector *Collector, debug bool) *Server {
-	server := NewServer(listen, collector, debug)
+func InitServer(listen string, collector *Collector, debug bool, logQueries bool) *Server {
+	server := NewServer(listen, collector, debug, logQueries)
 	server.echo.POST("/", server.writeHandler)
 	server.echo.GET("/status", server.statusHandler)
 	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
@@ -146,7 +147,7 @@ func RunServer(cnf Config) {
 	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.tlsServerName, cnf.Clickhouse.tlsSkipVerify)
 	sender.Dumper = dumper
 	for _, url := range cnf.Clickhouse.Servers {
-		sender.AddServer(url)
+		sender.AddServer(url, cnf.LogQueries)
 	}
 
 	collect := NewCollector(sender, cnf.FlushCount, cnf.FlushInterval, cnf.CleanInterval, cnf.RemoveQueryID)
@@ -155,7 +156,7 @@ func RunServer(cnf Config) {
 	signals := make(chan os.Signal)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-	srv := InitServer(cnf.Listen, collect, cnf.Debug)
+	srv := InitServer(cnf.Listen, collect, cnf.Debug, cnf.LogQueries)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

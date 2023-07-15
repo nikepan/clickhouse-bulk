@@ -45,6 +45,7 @@ Configuration file
   "flush_count": 10000, // check by \n char
   "flush_interval": 1000, // milliseconds
   "debug": false, // log incoming requests
+  "log_queries": true, // log "Sending/sent x rows to" messages for each query
   "dump_dir": "dumps", // directory for dump unsended data (if clickhouse errors)
   "clickhouse": {
     "down_timeout": 300, // wait if server in down (seconds)

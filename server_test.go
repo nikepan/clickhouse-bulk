@@ -20,7 +20,7 @@ import (
 func TestRunServer(t *testing.T) {
 	cnf, _ := ReadConfig("wrong_config.json")
 	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
-	server := InitServer("", collector, false)
+	server := InitServer("", collector, false, true)
 	go server.Start(cnf)
 	server.echo.POST("/", server.writeHandler)
 
@@ -107,8 +107,8 @@ func TestServer_MultiServer(t *testing.T) {
 	defer s2.Close()
 
 	sender := NewClickhouse(10, 10, "", false)
-	sender.AddServer(s1.URL)
-	sender.AddServer(s2.URL)
+	sender.AddServer(s1.URL, true)
+	sender.AddServer(s2.URL, true)
 	collect := NewCollector(sender, 1000, 1000, 0, true)
 	collect.AddTable("test")
 	collect.Push("eee", "eee")

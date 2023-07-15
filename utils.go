@@ -29,6 +29,7 @@ type Config struct {
 	DumpCheckInterval int              `json:"dump_check_interval"`
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
+	LogQueries		    bool             `json:"log_queries"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
 	UseTLS            bool             `json:"use_tls"`
 	TLSCertFile				string           `json:"tls_cert_file"`
@@ -102,6 +103,7 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
 	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.tlsSkipVerify)
 	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
+	readEnvBool("LOG_QUERIES", &cnf.LogQueries)
 
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")
 	if serversList != "" {

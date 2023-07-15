@@ -20,6 +20,7 @@ type ClickhouseServer struct {
 	LastRequest time.Time
 	Bad         bool
 	Client      *http.Client
+	LogQueries  bool
 }
 
 // Clickhouse - main clickhouse sender object
@@ -75,12 +76,12 @@ func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tl
 }
 
 // AddServer - add clickhouse server url
-func (c *Clickhouse) AddServer(url string) {
+func (c *Clickhouse) AddServer(url string, logQueries bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
 		Timeout: time.Second * time.Duration(c.ConnectTimeout), Transport: c.Transport,
-	}})
+	}, LogQueries: logQueries })
 }
 
 // DumpServers - dump servers state to prometheus
@@ -193,7 +194,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		if r.Params != "" {
 			url += "?" + r.Params
 		}
-		if r.isInsert {
+		if r.isInsert && srv.LogQueries {
 			log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		}
 		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
@@ -201,7 +202,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
-		if r.isInsert {
+		if r.isInsert && srv.LogQueries {
 			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		}
 		buf, _ := ioutil.ReadAll(resp.Body)
