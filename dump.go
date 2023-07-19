@@ -162,7 +162,13 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 			query = lines[1]
 			data = strings.Join(lines[1:], "\n")
 		}
-		_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data, Query: query, Count: len(lines[2:]), isInsert: true})
+		cr := &ClickhouseRequest{
+			Params:  params,
+			Content: data,
+			Query:   query,
+			Count:   len(lines[2:]),
+		}
+		_, status, err := sender.SendQuery(cr)
 		if err != nil {
 			return fmt.Errorf("server error (%+v) %+v", status, err)
 		}

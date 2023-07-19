@@ -18,10 +18,10 @@ import (
 )
 
 func TestRunServer(t *testing.T) {
-	cnf, _ := ReadConfig("wrong_config.json")
+	_ = ReadConfig("wrong_config.json")
 	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	server := InitServer("", collector, false, true)
-	go server.Start(cnf)
+	go server.Start()
 	server.echo.POST("/", server.writeHandler)
 
 	status, resp := request("POST", "/", "", server.echo)
@@ -125,11 +125,11 @@ func TestServer_MultiServer(t *testing.T) {
 	assert.True(t, sender.Empty())
 
 	os.Setenv("DUMP_CHECK_INTERVAL", "10")
-	cnf, err := ReadConfig("wrong_config.json")
+	err := ReadConfig("wrong_config.json")
 	os.Unsetenv("DUMP_CHECK_INTERVAL")
 	assert.Nil(t, err)
 	assert.Equal(t, 10, cnf.DumpCheckInterval)
-	go RunServer(cnf)
+	go RunServer()
 	time.Sleep(1000)
 }
 

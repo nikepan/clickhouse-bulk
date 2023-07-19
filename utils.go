@@ -3,12 +3,15 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 )
 
 const sampleConfig = "config.sample.json"
+
+var cnf Config
 
 type clickhouseConfig struct {
 	Servers        []string `json:"servers"`
@@ -29,11 +32,16 @@ type Config struct {
 	DumpCheckInterval int              `json:"dump_check_interval"`
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
-	LogQueries		    bool             `json:"log_queries"`
+	LogQueries        bool             `json:"log_queries"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
 	UseTLS            bool             `json:"use_tls"`
-	TLSCertFile				string           `json:"tls_cert_file"`
-	TLSKeyFile				string           `json:"tls_key_file"`
+	TLSCertFile       string           `json:"tls_cert_file"`
+	TLSKeyFile        string           `json:"tls_key_file"`
+}
+
+type Credentials struct {
+	User string
+	Pass string
 }
 
 // ReadJSON - read json file to struct
@@ -82,8 +90,8 @@ func readEnvString(name string, value *string) {
 }
 
 // ReadConfig init config data
-func ReadConfig(configFile string) (Config, error) {
-	cnf := Config{}
+func ReadConfig(configFile string) error {
+	cnf = Config{}
 	err := ReadJSON(configFile, &cnf)
 	if err != nil {
 		log.Printf("INFO: Config file %+v not found. Used%+v\n", configFile, sampleConfig)
@@ -116,5 +124,49 @@ func ReadConfig(configFile string) (Config, error) {
 		cnf.Clickhouse.tlsServerName = tlsServerName
 	}
 
-	return cnf, err
+	return err
+}
+
+// getAuth retrieves auth credentials from request
+// according to CH documentation @see "https://clickhouse.yandex/docs/en/interfaces/http/"
+func getAuth(req *http.Request) *Credentials {
+	// check X-ClickHouse- headers
+	name := req.Header.Get("X-ClickHouse-User")
+	pass := req.Header.Get("X-ClickHouse-Key")
+	if name != "" {
+		return &Credentials{
+			User: name,
+			Pass: pass,
+		}
+	}
+	// if header is empty - check basicAuth
+	if name, pass, ok := req.BasicAuth(); ok {
+		return &Credentials{
+			User: name,
+			Pass: pass,
+		}
+	}
+	// if basicAuth is empty - check URL params `user` and `password`
+	params := req.URL.Query()
+	if name := params.Get("user"); name != "" {
+		pass := params.Get("password")
+		return &Credentials{
+			User: name,
+			Pass: pass,
+		}
+	}
+	// if still no credentials - treat it as `default` user request
+	return &Credentials{
+		User: "default",
+		Pass: "",
+	}
+}
+
+func CopyHeader(dst, src http.Header) {
+	for k, vv := range src {
+		for _, v := range vv {
+			dst.Add(k, v)
+		}
+	}
+	dst.Add("Connection", "Close")
 }

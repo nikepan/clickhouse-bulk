@@ -42,7 +42,8 @@ func NewServer(listen string, collector *Collector, debug bool, logQueries bool)
 }
 
 func (server *Server) writeHandler(c echo.Context) error {
-	q, _ := ioutil.ReadAll(c.Request().Body)
+	req := c.Request()
+	q, _ := ioutil.ReadAll(req.Body)
 	s := string(q)
 
 	if server.Debug {
@@ -50,14 +51,8 @@ func (server *Server) writeHandler(c echo.Context) error {
 	}
 
 	qs := c.QueryString()
-	user, password, ok := c.Request().BasicAuth()
-	if ok {
-		if qs == "" {
-			qs = "user=" + user + "&password=" + password
-		} else {
-			qs = "user=" + user + "&password=" + password + "&" + qs
-		}
-	}
+	server.Collector.Sender.SetCreds(getAuth(req))
+
 	params, content, insert := server.Collector.ParseQuery(qs, s)
 	if insert {
 		if len(content) == 0 {
@@ -67,8 +62,14 @@ func (server *Server) writeHandler(c echo.Context) error {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
-	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, isInsert: false})
-	return c.String(status, resp)
+
+	res, buf := server.Collector.Sender.PassThru(req, q)
+
+	defer res.Body.Close()
+	CopyHeader(c.Response().Header(), res.Header)
+	c.Response().WriteHeader(res.StatusCode)
+	c.Response().Header().Set("Collection", "close")
+	return c.Stream(200, "application/octet-stream", buf)
 }
 
 func (server *Server) statusHandler(c echo.Context) error {
@@ -100,7 +101,7 @@ func (server *Server) tablesCleanHandler(c echo.Context) error {
 }
 
 // Start - start http server
-func (server *Server) Start(cnf Config) error {
+func (server *Server) Start() error {
 	if cnf.UseTLS {
 		return server.echo.StartTLS(server.Listen, cnf.TLSCertFile, cnf.TLSKeyFile)
 	} else {
@@ -141,7 +142,7 @@ func SafeQuit(collect *Collector, sender Sender) {
 }
 
 // RunServer - run all
-func RunServer(cnf Config) {
+func RunServer() {
 	InitMetrics(cnf.MetricsPrefix)
 	dumper := NewDumper(cnf.DumpDir)
 	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.tlsServerName, cnf.Clickhouse.tlsSkipVerify)
@@ -176,7 +177,7 @@ func RunServer(cnf Config) {
 		dumper.Listen(sender, cnf.DumpCheckInterval)
 	}
 
-	err := srv.Start(cnf)
+	err := srv.Start()
 	if err != nil {
 		log.Printf("ListenAndServe: %+v\n", err)
 		SafeQuit(collect, sender)
