@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"sync"
@@ -10,9 +11,11 @@ import (
 type Sender interface {
 	Send(r *ClickhouseRequest)
 	SendQuery(r *ClickhouseRequest) (response string, status int, err error)
+	PassThru(req *http.Request, clientReqBody []byte) (res *http.Response, buf *bytes.Buffer)
 	Len() int64
 	Empty() bool
 	WaitFlush() (err error)
+	SetCreds(c *Credentials)
 }
 
 type fakeSender struct {
@@ -32,6 +35,9 @@ func (s *fakeSender) SendQuery(r *ClickhouseRequest) (response string, status in
 	log.Printf("DEBUG: send query: %+v\n", s.sendQueryHistory)
 	return "", http.StatusOK, nil
 }
+func (c *fakeSender) PassThru(req *http.Request, clientReqBody []byte) (res *http.Response, buf *bytes.Buffer) {
+	return
+}
 
 func (s *fakeSender) Len() int64 {
 	return 0
@@ -43,4 +49,7 @@ func (s *fakeSender) Empty() bool {
 
 func (s *fakeSender) WaitFlush() error {
 	return nil
+}
+
+func (s *fakeSender) SetCreds(c *Credentials) {
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ type ClickhouseServer struct {
 	Bad         bool
 	Client      *http.Client
 	LogQueries  bool
+	Credentials *Credentials
 }
 
 // Clickhouse - main clickhouse sender object
@@ -33,15 +35,15 @@ type Clickhouse struct {
 	Dumper         Dumper
 	wg             sync.WaitGroup
 	Transport      *http.Transport
+	Credentials    *Credentials
 }
 
 // ClickhouseRequest - request struct for queue
 type ClickhouseRequest struct {
-	Params   string
-	Query    string
-	Content  string
-	Count    int
-	isInsert bool
+	Params  string
+	Query   string
+	Content string
+	Count   int
 }
 
 // ErrServerIsDown - signals about server is down
@@ -52,7 +54,7 @@ var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
 func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
-	tlsConfig := &tls.Config{}
+	tlsConfig := new(tls.Config)
 	if tlsServerName != "" {
 		tlsConfig.ServerName = tlsServerName
 	}
@@ -60,19 +62,30 @@ func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tl
 		tlsConfig.InsecureSkipVerify = tlsSkipVerify
 	}
 
-	c = new(Clickhouse)
-	c.DownTimeout = downTimeout
-	c.ConnectTimeout = connectTimeout
-	if c.ConnectTimeout <= 0 {
-		c.ConnectTimeout = 10
+	if connectTimeout <= 0 {
+		connectTimeout = 10
 	}
-	c.Servers = make([]*ClickhouseServer, 0)
-	c.Queue = queue.New(1000)
-	c.Transport = &http.Transport{
-		TLSClientConfig: tlsConfig,
+
+	c = &Clickhouse{
+		DownTimeout:    downTimeout,
+		ConnectTimeout: connectTimeout,
+		Servers:        make([]*ClickhouseServer, 0),
+		Queue:          queue.New(1000),
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+		Credentials: &Credentials{
+			User: "default",
+			Pass: "",
+		},
 	}
+
 	go c.Run()
 	return c
+}
+
+func (click *Clickhouse) SetCreds(creds *Credentials) {
+	click.Credentials = creds
 }
 
 // AddServer - add clickhouse server url
@@ -125,6 +138,8 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 	if srv != nil {
 		srv.LastRequest = time.Now()
 	}
+
+	srv.Credentials = c.Credentials
 	return srv
 
 }
@@ -190,29 +205,39 @@ func (c *Clickhouse) WaitFlush() (err error) {
 // SendQuery - sends query to server and return result
 func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	if srv.URL != "" {
+		log.Printf("INFO: sending %+v rows to %+v\n", r.Count, srv.URL)
+		if cnf.Debug {
+			log.Printf("DEBUG: query %+v\n", r.Query)
+		}
+
 		url := srv.URL
 		if r.Params != "" {
 			url += "?" + r.Params
 		}
-		if r.isInsert && srv.LogQueries {
-			log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
-		}
-		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
+
+		conn := srv.Client
+		req, _ := http.NewRequest("POST", url, strings.NewReader(r.Content))
+		req.Header.Add("X-ClickHouse-User", srv.Credentials.User)
+		req.Header.Add("X-ClickHouse-Key", srv.Credentials.Pass)
+		resp, err := conn.Do(req)
 		if err != nil {
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
-		if r.isInsert && srv.LogQueries {
-			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
-		}
+		defer resp.Body.Close()
 		buf, _ := ioutil.ReadAll(resp.Body)
 		s := string(buf)
 		if resp.StatusCode >= 502 {
 			srv.Bad = true
 			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
-			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)
+			err = fmt.Errorf("ERROR: Wrong server status %+v:\nresponse: %+v\n", resp.StatusCode, s)
+			if cnf.Debug {
+				err = fmt.Errorf("ERROR: Wrong server status %+v:\nresponse: %+v\nRequest: %#v\n", resp.StatusCode, s, r.Content)
+			}
 		}
+
+		log.Printf("INFO: sent %+v rows to %+v\n", r.Count, srv.URL)
 		return s, resp.StatusCode, err
 	}
 
@@ -232,5 +257,28 @@ func (c *Clickhouse) SendQuery(r *ClickhouseRequest) (response string, status in
 			return response, status, err
 		}
 		return "", http.StatusServiceUnavailable, ErrNoServers
+	}
+}
+
+func (c *Clickhouse) PassThru(req *http.Request, clientReqBody []byte) (res *http.Response, buf *bytes.Buffer) {
+	for {
+		s := c.GetNextServer()
+		if s != nil {
+			reqBuf := bytes.NewBuffer(clientReqBody)
+
+			clickReq, _ := http.NewRequest(req.Method, s.URL, reqBuf)
+
+			CopyHeader(clickReq.Header, req.Header)
+			res, err := s.Client.Do(clickReq)
+			if errors.Is(err, ErrServerIsDown) {
+				log.Printf("ERROR: server down (%+v): %+v\n", res.Status, res)
+				continue
+			}
+
+			resBody, _ := ioutil.ReadAll(res.Body)
+			defer res.Body.Close()
+
+			return res, bytes.NewBuffer(resBody)
+		}
 	}
 }

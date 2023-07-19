@@ -23,9 +23,9 @@ func main() {
 		return
 	}
 
-	cnf, err := ReadConfig(*configFile)
+	err := ReadConfig(*configFile)
 	if err != nil {
 		log.Fatalf("ERROR: %+v\n", err)
 	}
-	RunServer(cnf)
+	RunServer()
 }
