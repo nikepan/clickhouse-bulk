@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -42,7 +42,7 @@ func NewServer(listen string, collector *Collector, debug bool, logQueries bool)
 }
 
 func (server *Server) writeHandler(c echo.Context) error {
-	q, _ := ioutil.ReadAll(c.Request().Body)
+	q, _ := io.ReadAll(c.Request().Body)
 	s := string(q)
 
 	if server.Debug {

@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -75,7 +74,7 @@ func (d *FileDumper) Dump(params string, content string, response string, prefix
 	}
 	d.DumpNum++
 	file_path := path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status))
-	err = ioutil.WriteFile(file_path, []byte(data), 0644)
+	err = os.WriteFile(file_path, []byte(data), 0644)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
 	} else {
@@ -94,7 +93,7 @@ func (d *FileDumper) GetDump() (string, error) {
 		return "", err
 	}
 
-	files, err := ioutil.ReadDir(d.Path)
+	files, err := os.ReadDir(d.Path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -120,7 +119,7 @@ func (d *FileDumper) GetDump() (string, error) {
 // GetDumpData - get dump data from filesystem
 func (d *FileDumper) GetDumpData(id string) (data string, response string, err error) {
 	path := d.makePath(id)
-	s, err := ioutil.ReadFile(path)
+	s, err := os.ReadFile(path)
 	items := strings.Split(string(s), dumpResponseMark)
 	if len(items) > 1 {
 		return items[0], items[1], err
