@@ -351,46 +351,64 @@ func (c *Collector) ParseQuery(queryString string, body string) (params string, 
 
 // Parse - parsing text for query and data
 func (c *Collector) Parse(text string) (prefix string, content string) {
+	i, k := c.findIndices(text)
+	return c.splitText(text, i, k)
+}
+
+func (c *Collector) findIndices(text string) (int, int) {
 	i := strings.Index(text, "FORMAT")
 	k := strings.Index(text, "VALUES")
 	if k == -1 {
 		k = strings.Index(text, "values")
 	}
-	if i >= 0 && i < k {
-		w := false
-		off := -1
-		for c := i + 7; c < len(text); c++ {
-			if !w && text[c] != ' ' && text[c] != '\n' && text[c] != ';' {
-				w = true
-			}
-			if w && (text[c] == ' ' || text[c] == '\n' || text[c] == ';') {
-				off = c + 1
-				break
-			}
+	return i, k
+}
+
+func (c *Collector) handleExistingIndices(text string, i int) (prefix string, content string) {
+	w := false
+	off := -1
+	for c := i + 7; c < len(text); c++ {
+		if !w && text[c] != ' ' && text[c] != '\n' && text[c] != ';' {
+			w = true
 		}
-		if off >= 0 {
-			prefix = text[:off]
-			content = text[off:]
+		if w && (text[c] == ' ' || text[c] == '\n' || text[c] == ';') {
+			off = c + 1
+			break
 		}
+	}
+	if off >= 0 {
+		prefix = text[:off]
+		content = text[off:]
+	}
+	return prefix, content
+}
+
+func (c *Collector) handleNonExistingIndices(text string, k int) (prefix string, content string) {
+	if k >= 0 {
+		prefix = strings.TrimSpace(text[:k+6])
+		content = strings.TrimSpace(text[k+6:])
 	} else {
-		if k >= 0 {
-			prefix = strings.TrimSpace(text[:k+6])
-			content = strings.TrimSpace(text[k+6:])
+		off := regexFormat.FindStringSubmatchIndex(text)
+		if len(off) > 3 {
+			prefix = text[:off[3]]
+			content = text[off[3]:]
 		} else {
-			off := regexFormat.FindStringSubmatchIndex(text)
-			if len(off) > 3 {
-				prefix = text[:off[3]]
-				content = text[off[3]:]
+			off := regexValues.FindStringSubmatchIndex(text)
+			if len(off) > 0 {
+				prefix = text[:off[1]]
+				content = text[off[1]:]
 			} else {
-				off := regexValues.FindStringSubmatchIndex(text)
-				if len(off) > 0 {
-					prefix = text[:off[1]]
-					content = text[off[1]:]
-				} else {
-					prefix = text
-				}
+				prefix = text
 			}
 		}
 	}
 	return prefix, content
+}
+
+func (c *Collector) splitText(text string, i int, k int) (prefix string, content string) {
+	if i >= 0 && i < k {
+		return c.handleExistingIndices(text, i)
+	} else {
+		return c.handleNonExistingIndices(text, k)
+	}
 }
