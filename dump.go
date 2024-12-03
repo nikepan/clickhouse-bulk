@@ -95,7 +95,7 @@ func (d *FileDumper) GetDump() (string, error) {
 
 	files, err := os.ReadDir(d.Path)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	dumpFiles := make([]string, 0)
 	for _, f := range files {

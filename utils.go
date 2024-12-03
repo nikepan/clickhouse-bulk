@@ -29,11 +29,11 @@ type Config struct {
 	DumpCheckInterval int              `json:"dump_check_interval"`
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
-	LogQueries		    bool             `json:"log_queries"`
+	LogQueries        bool             `json:"log_queries"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
 	UseTLS            bool             `json:"use_tls"`
-	TLSCertFile				string           `json:"tls_cert_file"`
-	TLSKeyFile				string           `json:"tls_key_file"`
+	TLSCertFile       string           `json:"tls_cert_file"`
+	TLSKeyFile        string           `json:"tls_key_file"`
 }
 
 // ReadJSON - read json file to struct
@@ -86,7 +86,7 @@ func ReadConfig(configFile string) (Config, error) {
 	cnf := Config{}
 	err := ReadJSON(configFile, &cnf)
 	if err != nil {
-		log.Printf("INFO: Config file %+v not found. Used%+v\n", configFile, sampleConfig)
+		log.Printf("INFO: Config file %+v not found. Used %+v\n", configFile, sampleConfig)
 		err = ReadJSON(sampleConfig, &cnf)
 		if err != nil {
 			log.Printf("ERROR: read %+v failed\n", sampleConfig)
