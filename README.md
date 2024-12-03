@@ -18,7 +18,7 @@ or
 [Use docker image](https://hub.docker.com/r/nikepan/clickhouse-bulk/)
 
 
-or from sources (Go 1.13+):
+or from sources (Go 1.23+):
 
 ```text
 git clone https://github.com/nikepan/clickhouse-bulk
@@ -53,7 +53,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 
 
 ### Configuration file
-```javascript
+```json lines
 {
   "listen": ":8124",
   "flush_count": 10000, // check by \n char
