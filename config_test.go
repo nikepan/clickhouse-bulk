@@ -72,3 +72,42 @@ func TestConfigFileStructure(t *testing.T) {
 	assert.Greater(t, cnf.FlushCount, 0)
 	assert.Greater(t, len(cnf.Clickhouse.Servers), 0)
 }
+
+func TestTLSConfig(t *testing.T) {
+	// Create a temporary config file with TLS settings
+	configContent := `{
+		"clickhouse": {
+			"servers": ["http://127.0.0.1:8123"],
+			"tls_server_name": "example.com",
+			"insecure_tls_skip_verify": true
+		}
+	}`
+	tmpFile, err := os.CreateTemp("", "test_tls_config_*.json")
+	assert.Nil(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(configContent)
+	assert.Nil(t, err)
+	tmpFile.Close()
+
+	// Load config from file
+	cnf, err := ReadConfig(tmpFile.Name())
+	assert.Nil(t, err)
+
+	// Verify TLS settings from file
+	assert.Equal(t, "example.com", cnf.Clickhouse.TLSServerName)
+	assert.True(t, cnf.Clickhouse.TLSSkipVerify)
+
+	// Override with environment variables
+	os.Setenv("CLICKHOUSE_TLS_SERVER_NAME", "override.com")
+	os.Setenv("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", "false")
+	defer os.Unsetenv("CLICKHOUSE_TLS_SERVER_NAME")
+	defer os.Unsetenv("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY")
+
+	cnf, err = ReadConfig(tmpFile.Name())
+	assert.Nil(t, err)
+
+	// Verify TLS settings from environment variables
+	assert.Equal(t, "override.com", cnf.Clickhouse.TLSServerName)
+	assert.False(t, cnf.Clickhouse.TLSSkipVerify)
+}

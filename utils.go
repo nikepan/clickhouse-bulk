@@ -12,8 +12,8 @@ const sampleConfig = "config.sample.json"
 
 type clickhouseConfig struct {
 	Servers        []string `json:"servers"`
-	tlsServerName  string   `json:"tls_server_name"`
-	tlsSkipVerify  bool     `json:"insecure_tls_skip_verify"`
+	TLSServerName  string   `json:"tls_server_name"`
+	TLSSkipVerify  bool     `json:"insecure_tls_skip_verify"`
 	DownTimeout    int      `json:"down_timeout"`
 	ConnectTimeout int      `json:"connect_timeout"`
 }
@@ -54,6 +54,8 @@ func defaultConfig() Config {
 		Clickhouse: clickhouseConfig{
 			DownTimeout:    60,
 			ConnectTimeout: 10,
+			TLSServerName:  "",
+			TLSSkipVerify:  false,
 			Servers:        []string{"http://127.0.0.1:8123"},
 		},
 	}
@@ -130,7 +132,8 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
 	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
-	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.tlsSkipVerify)
+	readEnvString("CLICKHOUSE_TLS_SERVER_NAME", &cnf.Clickhouse.TLSServerName)
+	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.TLSSkipVerify)
 	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
 	readEnvBool("LOG_QUERIES", &cnf.LogQueries)
 
