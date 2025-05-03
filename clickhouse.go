@@ -187,11 +187,6 @@ func (c *Clickhouse) WaitFlush() (err error) {
 	return nil
 }
 
-// Add a simple function call so we can test WaitFlush in the new test
-func (c *Clickhouse) FlushAll() {
-	c.WaitFlush()
-}
-
 // SendQuery - sends query to server and return result
 func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	if srv.URL != "" {

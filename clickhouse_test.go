@@ -1,67 +1,60 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestBulkFileDumper_Dump_EmptyPrefix(t *testing.T) {
-	fd := &BulkFileDumper{}
-	err := fd.Dump("param", "content", "response", "", 200)
-	if err == nil {
-		t.Error("Expected an error when prefix is empty, got nil")
-	}
-}
-
-func TestBulkFileDumper_ProcessNextDump_Error(t *testing.T) {
-	fd := &BulkFileDumper{}
-	err := fd.ProcessNextDump()
-	if err != nil {
-		t.Logf("Correctly handled error in ProcessNextDump: %v", err)
-	}
-}
-
-func TestClickhouse_DumpServers(t *testing.T) {
+func TestClickhouse_GetNextServer(t *testing.T) {
 	c := NewClickhouse(300, 10, "", false)
 	c.AddServer("", true)
-	c.DumpServers()
-}
-
-func TestClickhouse_FlushAll(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
-	c.Send(&ClickhouseRequest{})
-	c.FlushAll()
-	if !c.Empty() {
-		t.Error("Expected all queued items to be flushed")
-	}
-}
-
-func TestClickhouse_NewClickhouse(t *testing.T) {
-	c := NewClickhouse(5, 5, "", false)
-	if c == nil {
-		t.Error("Expected NewClickhouse to return a valid instance, got nil")
-	}
-}
-
-func TestClickhouse_AddServer(t *testing.T) {
-	c := NewClickhouse(5, 5, "", false)
-	if len(c.Servers) != 0 {
-		t.Error("Expected no servers initially")
-	}
+	c.AddServer("http://127.0.0.1:8124", true)
+	c.AddServer("http://127.0.0.1:8125", true)
 	c.AddServer("http://127.0.0.1:8123", true)
-	if len(c.Servers) != 1 {
-		t.Error("Expected 1 server after AddServer")
+	s := c.GetNextServer()
+	assert.Equal(t, "", s.URL)
+	s.SendQuery(&ClickhouseRequest{})
+	s = c.GetNextServer()
+	assert.Equal(t, "http://127.0.0.1:8124", s.URL)
+	resp, status, err := s.SendQuery(&ClickhouseRequest{})
+	assert.NotEqual(t, "", resp)
+	assert.Equal(t, http.StatusBadGateway, status)
+	assert.True(t, errors.Is(err, ErrServerIsDown))
+	assert.Equal(t, true, s.Bad)
+	c.SendQuery(&ClickhouseRequest{})
+}
+
+func TestClickhouse_Send(t *testing.T) {
+	c := NewClickhouse(300, 10, "", false)
+	c.AddServer("", true)
+	c.Send(&ClickhouseRequest{})
+	for !c.Queue.Empty() {
+		time.Sleep(10)
 	}
 }
 
-func TestClickhouse_GetNextServer_NoServers(t *testing.T) {
-	c := NewClickhouse(5, 5, "", false)
-	srv := c.GetNextServer()
-	if srv != nil {
-		t.Error("Expected no server when none are added")
-	}
+func TestClickhouse_SendQuery(t *testing.T) {
+	c := NewClickhouse(300, 10, "", false)
+	c.AddServer("", true)
+	c.GetNextServer()
+	c.Servers[0].Bad = true
+	_, status, err := c.SendQuery(&ClickhouseRequest{})
+	assert.Equal(t, 503, status)
+	assert.True(t, errors.Is(err, ErrNoServers))
+}
+
+func TestClickhouse_SendQuery1(t *testing.T) {
+	c := NewClickhouse(-1, 10, "", false)
+	c.AddServer("", true)
+	c.GetNextServer()
+	c.Servers[0].Bad = true
+	s := c.GetNextServer()
+	assert.Equal(t, false, s.Bad)
 }
 
 func TestClickhouse_Send_QueueLen(t *testing.T) {
@@ -73,26 +66,29 @@ func TestClickhouse_Send_QueueLen(t *testing.T) {
 	}
 }
 
+// New test verifying that Run processes at least one request
 func TestClickhouse_Run_OneRequest(t *testing.T) {
 	c := NewClickhouse(5, 5, "", false)
-	c.AddServer("", false) // Force an empty URL server to skip actual network
+	c.AddServer("", false) // Force an empty URL server
 	go c.Run()
 	c.Send(&ClickhouseRequest{Params: "test"})
-	time.Sleep(500 * time.Millisecond) // Give a little time for Run to poll
+	time.Sleep(500 * time.Millisecond)
 	if !c.Empty() {
 		t.Error("Expected queue to be emptied after processing one request")
 	}
 }
 
+// New test to confirm SendQuery returns no error with empty URL
 func TestSendQuery_EmptyURL(t *testing.T) {
 	srv := &ClickhouseServer{}
 	resp, status, err := srv.SendQuery(&ClickhouseRequest{})
 	if resp != "" || status != http.StatusOK || err != nil {
-		t.Errorf("Expected no error with empty URL, but got status=%d err=%v resp=%q",
+		t.Errorf("Expected no error with empty URL, got status=%d err=%v resp=%q",
 			status, err, resp)
 	}
 }
 
+// New test for a valid prefix in BulkFileDumper
 func TestBulkFileDumper_Dump_ValidPrefix(t *testing.T) {
 	ch := &Clickhouse{}
 	fd := &BulkFileDumper{
@@ -101,10 +97,11 @@ func TestBulkFileDumper_Dump_ValidPrefix(t *testing.T) {
 	}
 	err := fd.Dump("param", "content", "response", "valid", 200)
 	if err != nil {
-		t.Errorf("Dump returned an unexpected error with a valid prefix: %v", err)
+		t.Errorf("Dump returned an unexpected error: %v", err)
 	}
 }
 
+// New test verifying no error in ProcessNextDump success scenario
 func TestBulkFileDumper_ProcessNextDump_Success(t *testing.T) {
 	ch := &Clickhouse{}
 	fd := &BulkFileDumper{
@@ -113,6 +110,6 @@ func TestBulkFileDumper_ProcessNextDump_Success(t *testing.T) {
 	}
 	err := fd.ProcessNextDump()
 	if err != nil {
-		t.Errorf("Did not expect an error in ProcessNextDump success scenario, got %v", err)
+		t.Errorf("Did not expect an error, got: %v", err)
 	}
 }

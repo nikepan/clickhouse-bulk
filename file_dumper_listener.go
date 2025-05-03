@@ -14,10 +14,9 @@ func (fd *BulkFileDumper) ProcessNextDump() error {
 	return nil
 }
 
-// Define a minimal stub for doSomeQueueWork
+// doSomeQueueWork simulates reading from a queue (returns nil unless forced to fail)
 func doSomeQueueWork() error {
-	// Return an error if we detect "fail" in some condition (mock scenario)
-	if false /* e.g. check a global test flag */ {
+	if false { // e.g. a condition or test flag
 		return fmt.Errorf("queue read error")
 	}
 	return nil
