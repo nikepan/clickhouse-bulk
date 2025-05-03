@@ -1,6 +1,9 @@
 package main
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 type BulkFileDumper struct {
 	mu         sync.Mutex
@@ -11,5 +14,14 @@ type BulkFileDumper struct {
 func (fd *BulkFileDumper) Dump(params, content, response, prefix string, status int) error {
 	fd.mu.Lock()
 	defer fd.mu.Unlock()
+	err := doSomeDumpLogic(params, content, response, prefix, status)
+	if err != nil {
+		log.Printf("Dump error: %v", err)
+		return err
+	}
+	return nil
+}
+
+func doSomeDumpLogic(params, content, response, prefix string, status int) error {
 	return nil
 }

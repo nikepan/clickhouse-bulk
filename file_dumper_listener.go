@@ -1,8 +1,20 @@
 package main
 
-// ProcessNextDump processes the next item in the dumping queue.
+import (
+	"log"
+)
+
 func (fd *BulkFileDumper) ProcessNextDump() error {
-	// Here you would handle the next dump task, e.g. reading data from a queue.
+	err := doSomeQueueWork()
+	if err != nil {
+		log.Printf("ProcessNextDump error: %v", err)
+		return err
+	}
+	return nil
+}
+
+// Define a minimal stub for doSomeQueueWork
+func doSomeQueueWork() error {
 	return nil
 }
 
@@ -13,6 +25,7 @@ func (fd *BulkFileDumper) Listen() {
 		fd.mu.Unlock()
 
 		if err != nil {
+			log.Printf("ProcessNextDump returned an error: %v", err)
 			continue
 		}
 
@@ -21,6 +34,7 @@ func (fd *BulkFileDumper) Listen() {
 		fd.clickhouse.mu.Unlock()
 
 		if err != nil {
+			log.Printf("SendQuery error: %v", err)
 		}
 	}
 }

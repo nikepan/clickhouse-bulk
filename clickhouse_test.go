@@ -58,14 +58,11 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 }
 
 func TestBulkFileDumper_Dump(t *testing.T) {
-	// ...existing code...
-
 	ch := &Clickhouse{}
 	fd := &BulkFileDumper{
 		mu:         sync.Mutex{},
 		clickhouse: ch,
 	}
-
 	err := fd.Dump("param", "content", "response", "prefix", 200)
 	if err != nil {
 		t.Errorf("Dump returned an error: %v", err)
@@ -73,17 +70,11 @@ func TestBulkFileDumper_Dump(t *testing.T) {
 }
 
 func TestBulkFileDumper_Listener(t *testing.T) {
-	// ...existing code...
-
 	ch := &Clickhouse{}
 	fd := &BulkFileDumper{
 		mu:         sync.Mutex{},
 		clickhouse: ch,
 	}
-
-	// In a real test, you'd run fd.Listen() in a goroutine
-	// and possibly send data to be processed. Here we just
-	// ensure the logic doesn't panic immediately.
 	go fd.Listen()
 }
 
@@ -93,7 +84,6 @@ func TestBulkFileDumper_ProcessNextDump(t *testing.T) {
 		mu:         sync.Mutex{},
 		clickhouse: ch,
 	}
-
 	err := fd.ProcessNextDump()
 	if err != nil {
 		t.Errorf("ProcessNextDump returned an error: %v", err)
