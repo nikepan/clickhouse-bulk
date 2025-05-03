@@ -1,7 +1,8 @@
 package main
 
+// ProcessNextDump processes the next item in the dumping queue.
 func (fd *BulkFileDumper) ProcessNextDump() error {
-	// ...existing code...
+	// Here you would handle the next dump task, e.g. reading data from a queue.
 	return nil
 }
 
@@ -12,7 +13,6 @@ func (fd *BulkFileDumper) Listen() {
 		fd.mu.Unlock()
 
 		if err != nil {
-			// Handle error
 			continue
 		}
 
@@ -21,7 +21,6 @@ func (fd *BulkFileDumper) Listen() {
 		fd.clickhouse.mu.Unlock()
 
 		if err != nil {
-			// Handle error
 		}
 	}
 }
