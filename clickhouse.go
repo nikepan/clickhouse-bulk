@@ -139,6 +139,8 @@ func (c *Clickhouse) Send(r *ClickhouseRequest) {
 func (c *Clickhouse) Dump(params string, content string, response string, prefix string, status int) error {
 	dumpCounter.Inc()
 	if c.Dumper != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		return c.Dumper.Dump(params, content, response, prefix, status)
 	}
 	return nil
