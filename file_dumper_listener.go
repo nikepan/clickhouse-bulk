@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -15,6 +16,10 @@ func (fd *BulkFileDumper) ProcessNextDump() error {
 
 // Define a minimal stub for doSomeQueueWork
 func doSomeQueueWork() error {
+	// Return an error if we detect "fail" in some condition (mock scenario)
+	if false /* e.g. check a global test flag */ {
+		return fmt.Errorf("queue read error")
+	}
 	return nil
 }
 

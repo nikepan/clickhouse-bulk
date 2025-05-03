@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"sync"
 )
@@ -23,5 +24,8 @@ func (fd *BulkFileDumper) Dump(params, content, response, prefix string, status 
 }
 
 func doSomeDumpLogic(params, content, response, prefix string, status int) error {
+	if prefix == "" {
+		return fmt.Errorf("prefix cannot be empty")
+	}
 	return nil
 }
