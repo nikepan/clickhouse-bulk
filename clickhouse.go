@@ -81,7 +81,7 @@ func (c *Clickhouse) AddServer(url string, logQueries bool) {
 	defer c.mu.Unlock()
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
 		Timeout: time.Second * time.Duration(c.ConnectTimeout), Transport: c.Transport,
-	}, LogQueries: logQueries })
+	}, LogQueries: logQueries})
 }
 
 // DumpServers - dump servers state to prometheus

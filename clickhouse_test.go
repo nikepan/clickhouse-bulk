@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,4 +55,61 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 	c.Servers[0].Bad = true
 	s := c.GetNextServer()
 	assert.Equal(t, false, s.Bad)
+}
+
+func TestClickhouse_Send_QueueLen(t *testing.T) {
+	c := NewClickhouse(5, 5, "", false)
+	qLen := c.Len()
+	c.Send(&ClickhouseRequest{Params: "test"})
+	if c.Len() != qLen+1 {
+		t.Error("Expected queue length to increase after Send")
+	}
+}
+
+// New test verifying that Run processes at least one request
+func TestClickhouse_Run_OneRequest(t *testing.T) {
+	c := NewClickhouse(5, 5, "", false)
+	c.AddServer("", false) // Force an empty URL server
+	go c.Run()
+	c.Send(&ClickhouseRequest{Params: "test"})
+	time.Sleep(500 * time.Millisecond)
+	if !c.Empty() {
+		t.Error("Expected queue to be emptied after processing one request")
+	}
+}
+
+// New test to confirm SendQuery returns no error with empty URL
+func TestSendQuery_EmptyURL(t *testing.T) {
+	srv := &ClickhouseServer{}
+	resp, status, err := srv.SendQuery(&ClickhouseRequest{})
+	if resp != "" || status != http.StatusOK || err != nil {
+		t.Errorf("Expected no error with empty URL, got status=%d err=%v resp=%q",
+			status, err, resp)
+	}
+}
+
+// New test for a valid prefix in BulkFileDumper
+func TestBulkFileDumper_Dump_ValidPrefix(t *testing.T) {
+	ch := &Clickhouse{}
+	fd := &BulkFileDumper{
+		mu:         sync.Mutex{},
+		clickhouse: ch,
+	}
+	err := fd.Dump("param", "content", "response", "valid", 200)
+	if err != nil {
+		t.Errorf("Dump returned an unexpected error: %v", err)
+	}
+}
+
+// New test verifying no error in ProcessNextDump success scenario
+func TestBulkFileDumper_ProcessNextDump_Success(t *testing.T) {
+	ch := &Clickhouse{}
+	fd := &BulkFileDumper{
+		mu:         sync.Mutex{},
+		clickhouse: ch,
+	}
+	err := fd.ProcessNextDump()
+	if err != nil {
+		t.Errorf("Did not expect an error, got: %v", err)
+	}
 }

@@ -89,15 +89,15 @@ func readEnvInt(name string, value *int) {
 }
 
 func readEnvBool(name string, value *bool) {
-    s := os.Getenv(name)
-    if s != "" {
-        v, err := strconv.ParseBool(s)
-        if err != nil {
-            log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
-        } else {
-            *value = v
-        }
-    }
+	s := os.Getenv(name)
+	if s != "" {
+		v, err := strconv.ParseBool(s)
+		if err != nil {
+			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		} else {
+			*value = v
+		}
+	}
 }
 
 func readEnvString(name string, value *string) {
@@ -106,7 +106,6 @@ func readEnvString(name string, value *string) {
 		*value = s
 	}
 }
-
 
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {
