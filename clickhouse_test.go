@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,4 +55,47 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 	c.Servers[0].Bad = true
 	s := c.GetNextServer()
 	assert.Equal(t, false, s.Bad)
+}
+
+func TestBulkFileDumper_Dump(t *testing.T) {
+	// ...existing code...
+
+	ch := &Clickhouse{}
+	fd := &BulkFileDumper{
+		mu:         sync.Mutex{},
+		clickhouse: ch,
+	}
+
+	err := fd.Dump("param", "content", "response", "prefix", 200)
+	if err != nil {
+		t.Errorf("Dump returned an error: %v", err)
+	}
+}
+
+func TestBulkFileDumper_Listener(t *testing.T) {
+	// ...existing code...
+
+	ch := &Clickhouse{}
+	fd := &BulkFileDumper{
+		mu:         sync.Mutex{},
+		clickhouse: ch,
+	}
+
+	// In a real test, you'd run fd.Listen() in a goroutine
+	// and possibly send data to be processed. Here we just
+	// ensure the logic doesn't panic immediately.
+	go fd.Listen()
+}
+
+func TestBulkFileDumper_ProcessNextDump(t *testing.T) {
+	ch := &Clickhouse{}
+	fd := &BulkFileDumper{
+		mu:         sync.Mutex{},
+		clickhouse: ch,
+	}
+
+	err := fd.ProcessNextDump()
+	if err != nil {
+		t.Errorf("ProcessNextDump returned an error: %v", err)
+	}
 }
