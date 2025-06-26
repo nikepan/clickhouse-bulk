@@ -9,13 +9,13 @@ ENV GOOS=linux \
 WORKDIR /go/src/github.com/nikepan/clickhouse-bulk
 
 # cache dependencies
-ADD go.* ./
+COPY go.* ./
 RUN go mod download
 
-ADD . ./
+COPY . ./
 RUN go build
 
-FROM alpine:latest
+FROM alpine:3
 RUN apk add ca-certificates
 WORKDIR /app
 RUN mkdir /app/dumps
