@@ -19,7 +19,7 @@ jobs:
         go-version: 1.23.3
 
     - name: Build
-      run: go build -v ./...
+      run: go build ./...
 
     - name: Test
       run: go test -v ./...
@@ -27,11 +27,10 @@ jobs:
     - name: Coverage
       run: go test -v -race -covermode=atomic -coverprofile=coverage.out
 
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v2
-      with:
-        files: ./coverage.out
-        flags: unittests
-        fail_ci_if_error: true
-        verbose: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+    - name: Upload coverage to Codacy
+      run: |
+        curl -Ls https://coverage.codacy.com/get.sh > codacy-coverage-reporter.sh
+        chmod +x codacy-coverage-reporter.sh
+        ./codacy-coverage-reporter.sh report --force-coverage-parser go -r coverage.out
+      env:
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
