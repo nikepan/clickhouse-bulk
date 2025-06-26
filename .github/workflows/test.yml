@@ -28,9 +28,9 @@ jobs:
       run: go test -v -race -covermode=atomic -coverprofile=coverage.out
 
     - name: Upload coverage to Codacy
-    run: |
-      curl -Ls https://coverage.codacy.com/get.sh > codacy-coverage-reporter.sh
-      chmod +x codacy-coverage-reporter.sh
-      ./codacy-coverage-reporter.sh report --force-coverage-parser go -r unit.coverage.out
-    env:
-      CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+      run: |
+        curl -Ls https://coverage.codacy.com/get.sh > codacy-coverage-reporter.sh
+        chmod +x codacy-coverage-reporter.sh
+        ./codacy-coverage-reporter.sh report --force-coverage-parser go -r unit.coverage.out
+      env:
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
