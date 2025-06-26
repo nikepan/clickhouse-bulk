@@ -1,4 +1,4 @@
-FROM golang:1.23 as builder
+FROM golang:1.24 as builder
 
 ARG GOPROXY
 ENV GOOS=linux \
@@ -13,7 +13,7 @@ ADD go.* ./
 RUN go mod download
 
 ADD . ./
-RUN go build -v
+RUN go build
 
 FROM alpine:latest
 RUN apk add ca-certificates
