@@ -27,6 +27,9 @@ jobs:
     - name: Coverage
       run: go test -v -race -covermode=atomic -coverprofile=coverage.out
 
+    - name: List files for debug
+      run: ls -la
+
     - name: Upload coverage report to Codacy
       uses: codacy/codacy-coverage-reporter-action@v1
       with:
