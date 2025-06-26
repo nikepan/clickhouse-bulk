@@ -27,11 +27,14 @@ jobs:
     - name: Coverage
       run: go test -v -race -covermode=atomic -coverprofile=coverage.out
 
-    - name: List files for debug
-      run: ls -la
+    - name: Install gocov-lcov
+      run: go install github.com/jandelgado/gocov-lcov@latest
+
+    - name: Convert Go coverage to lcov
+      run: gocov convert coverage.out | gocov-lcov > coverage.lcov
 
     - name: Upload coverage report to Codacy
       uses: codacy/codacy-coverage-reporter-action@v1
       with:
         project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-        coverage-reports: coverage.out
+        coverage-reports: coverage.lcov
