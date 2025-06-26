@@ -19,7 +19,7 @@ jobs:
         go-version: 1.23.3
 
     - name: Build
-      run: go build -v ./...
+      run: go build ./...
 
     - name: Test
       run: go test -v ./...
@@ -31,6 +31,6 @@ jobs:
       run: |
         curl -Ls https://coverage.codacy.com/get.sh > codacy-coverage-reporter.sh
         chmod +x codacy-coverage-reporter.sh
-        ./codacy-coverage-reporter.sh report --force-coverage-parser go -r unit.coverage.out
+        ./codacy-coverage-reporter.sh report --force-coverage-parser go -r coverage.out
       env:
         CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
