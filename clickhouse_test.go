@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -55,3 +56,27 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 	s := c.GetNextServer()
 	assert.Equal(t, false, s.Bad)
 }
+
+func TestClickhouse_ResponseBodyClosed(t *testing.T) {
+	var closed bool
+	body := &spyBody{onClose: func() { closed = true }}
+	
+	c := NewClickhouse(300, 10, "", false)
+	c.AddServer("http://example.com", false)
+	srv := c.GetNextServer()
+	srv.Client = &http.Client{
+		Transport: &spyTransport{body: body},
+	}
+
+	srv.SendQuery(&ClickhouseRequest{Content: "test"})
+	assert.True(t, closed)
+}
+
+type spyTransport struct{ body *spyBody }
+func (t *spyTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: 200, Body: t.body}, nil
+}
+
+type spyBody struct{ onClose func() }
+func (b *spyBody) Read(p []byte) (int, error) { copy(p, "OK"); return 2, io.EOF }
+func (b *spyBody) Close() error { b.onClose(); return nil }
