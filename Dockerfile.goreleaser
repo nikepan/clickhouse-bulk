@@ -1,0 +1,8 @@
+FROM alpine:3
+RUN apk add ca-certificates
+WORKDIR /app
+RUN mkdir /app/dumps
+COPY config.sample.json .
+COPY clickhouse-bulk .
+EXPOSE 8123
+ENTRYPOINT ["./clickhouse-bulk", "-config=config.sample.json"]

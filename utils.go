@@ -142,6 +142,6 @@ func ReadConfig(configFile string) (Config, error) {
 		cnf.Clickhouse.Servers = strings.Split(serversList, ",")
 	}
 
-	log.Printf("use servers: %+v", strings.Join(cnf.Clickhouse.Servers, ", "))
+	log.Printf("Using servers: %+v", strings.Join(cnf.Clickhouse.Servers, ", "))
 	return cnf, nil
 }
