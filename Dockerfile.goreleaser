@@ -1,6 +1,5 @@
 FROM alpine:3
 WORKDIR /app
-RUN mkdir /app/dumps
 COPY config.sample.json .
 COPY clickhouse-bulk .
 EXPOSE 8123

@@ -42,7 +42,7 @@ func (d *FileDumper) checkDir(create bool) error {
 	_, err := os.Stat(d.Path)
 	if os.IsNotExist(err) {
 		if create {
-			return os.Mkdir(d.Path, 0777)
+			return os.Mkdir(d.Path, 0666)
 		}
 	}
 	return err
