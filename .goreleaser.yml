@@ -1,4 +1,5 @@
----
+version: 2
+
 project_name: clickhouse-bulk
 
 release:
@@ -8,12 +9,13 @@ release:
 
 builds:
   - binary: clickhouse-bulk
-    goos: &goos
+    goos:
       - darwin
       - windows
       - linux
-    goarch: &goarch
+    goarch:
       - amd64
+      - arm64
       - 386
     env:
       - CGO_ENABLED=0
@@ -27,8 +29,52 @@ archives:
   - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ['zip']
     files:
       - config.sample.json
       - README.md
       - LICENSE
+
+dockers:
+  - image_templates:
+      - "nikepan/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "nikepan/{{ .ProjectName }}:{{ .Version }}-amd64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goos: linux
+    goarch: amd64
+    extra_files:
+      - config.sample.json
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+
+  - image_templates:
+      - "nikepan/{{ .ProjectName }}:{{ .Tag }}-arm64"
+      - "nikepan/{{ .ProjectName }}:{{ .Version }}-arm64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goos: linux
+    goarch: arm64
+    extra_files:
+      - config.sample.json
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+
+docker_manifests:
+  - name_template: "nikepan/{{ .ProjectName }}:{{ .Tag }}"
+    image_templates:
+      - "nikepan/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "nikepan/{{ .ProjectName }}:{{ .Tag }}-arm64"
+
+  - name_template: "nikepan/{{ .ProjectName }}:latest"
+    image_templates:
+      - "nikepan/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "nikepan/{{ .ProjectName }}:{{ .Version }}-arm64"
