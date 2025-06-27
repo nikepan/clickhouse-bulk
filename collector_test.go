@@ -167,3 +167,86 @@ func TestCollector_FlushAll(t *testing.T) {
 	c.Push(qTitle, qContent)
 	c.FlushAll()
 }
+
+func TestHandleExistingIndices(t *testing.T) {
+	tests := []struct {
+		name        string
+		text        string
+		i           int
+		wantPrefix  string
+		wantContent string
+	}{
+		{
+			name:        "test0",
+			text:        qTitle,
+			i:           0,
+			wantPrefix:  "INSERT INTO ",
+			wantContent: "table3 (c1, c2, c3) FORMAT TabSeparated",
+		},
+		{
+			name:        "test1",
+			text:        qTitle,
+			i:           1,
+			wantPrefix:  "INSERT INTO ",
+			wantContent: "table3 (c1, c2, c3) FORMAT TabSeparated",
+		},
+		{
+			name:        "test2",
+			text:        qTitle,
+			i:           4,
+			wantPrefix:  "INSERT INTO table3 ",
+			wantContent: "(c1, c2, c3) FORMAT TabSeparated",
+		},
+		{
+			name:        "test3",
+			text:        qTitle,
+			i:           5,
+			wantPrefix:  "INSERT INTO table3 ",
+			wantContent: "(c1, c2, c3) FORMAT TabSeparated",
+		},
+		{
+			name:        "test4",
+			text:        qTitle + " " + qContent,
+			i:           3,
+			wantPrefix:  "INSERT INTO ",
+			wantContent: "table3 (c1, c2, c3) FORMAT TabSeparated v11\tv12\tv13\nv21\tv22\tv23",
+		},
+		{
+			name:        "test5",
+			text:        qTitle + " " + qContent,
+			i:           4,
+			wantPrefix:  "INSERT INTO table3 ",
+			wantContent: "(c1, c2, c3) FORMAT TabSeparated v11\tv12\tv13\nv21\tv22\tv23",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+			gotPrefix, gotContent := c.handleExistingIndices(tt.text, tt.i)
+			assert.Equal(t, tt.wantPrefix, gotPrefix)
+			assert.Equal(t, tt.wantContent, gotContent)
+		})
+	}
+}
+
+func TestCleanTable(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	c.AddTable("test")
+	table := c.Tables["test"]
+	table.Add(qTitle + " " + qContent)
+
+	c.CleanTables()
+
+	select {
+	case _, ok := <-*table.TickerChan:
+		if ok {
+			t.Fatal("Table channel is not closed")
+		}
+	default:
+		t.Fatal("Table channel is not closed")
+	}
+
+	assert.Equal(t, true, c.Empty())
+
+}
