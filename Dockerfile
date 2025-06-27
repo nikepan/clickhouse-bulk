@@ -1,8 +1,10 @@
-FROM golang:1.24 as builder
+FROM golang:1.24 AS builder
 
+ARG TARGETOS
+ARG TARGETARCH
 ARG GOPROXY
-ENV GOOS=linux \
-    GOARCH=amd64 \
+ENV GOOS=$TARGETOS \
+    GOARCH=$TARGETARCH \
     CGO_ENABLED=0 \
     GO111MODULE=on
 
