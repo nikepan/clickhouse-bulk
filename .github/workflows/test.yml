@@ -33,4 +33,4 @@ jobs:
         chmod +x codacy-coverage-reporter.sh
         ./codacy-coverage-reporter.sh report --force-coverage-parser go -r coverage.out
       env:
-        CODACY_PROJECT_TOKEN: ${{ vars.CODACY_PROJECT_TOKEN }}
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
