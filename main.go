@@ -7,6 +7,7 @@ import (
 )
 
 var version = "unknown"
+var commit = "unknown"
 var date = "unknown"
 
 func main() {
@@ -19,9 +20,11 @@ func main() {
 	flag.Parse()
 
 	if flag.Arg(0) == "version" {
-		log.Printf("clickhouse-bulk ver. %+v (%+v)\n", version, date)
+		log.Printf("clickhouse-bulk v%s (commit: %s, built: %s)\n", version, commit, date)
 		return
 	}
+
+	log.Printf("Starting clickhouse-bulk v%s (commit: %s, built: %s)\n", version, commit, date)
 
 	cnf, err := ReadConfig(*configFile)
 	if err != nil {

@@ -38,7 +38,10 @@ type Status struct {
 
 // NewServer - create server
 func NewServer(listen string, collector *Collector, debug bool, logQueries bool) *Server {
-	return &Server{listen, collector, debug, logQueries, echo.New()}
+	e := echo.New()
+	e.HideBanner = true
+	e.HidePort = true
+	return &Server{listen, collector, debug, logQueries, e}
 }
 
 func (server *Server) writeHandler(c echo.Context) error {
@@ -176,6 +179,7 @@ func RunServer(cnf Config) {
 		dumper.Listen(sender, cnf.DumpCheckInterval)
 	}
 
+	log.Printf("Server starting on %s\n", cnf.Listen)
 	err := srv.Start(cnf)
 	if err != nil {
 		log.Printf("ListenAndServe: %+v\n", err)
