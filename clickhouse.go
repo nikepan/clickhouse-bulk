@@ -52,7 +52,9 @@ var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
 func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 	if tlsServerName != "" {
 		tlsConfig.ServerName = tlsServerName
 	}
