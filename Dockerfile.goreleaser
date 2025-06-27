@@ -1,5 +1,4 @@
 FROM alpine:3
-RUN apk add ca-certificates
 WORKDIR /app
 RUN mkdir /app/dumps
 COPY config.sample.json .
