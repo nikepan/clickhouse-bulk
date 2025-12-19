@@ -137,21 +137,27 @@ func (d *FileDumper) DeleteDump(id string) error {
 // ProcessNextDump - try to send next dump to server
 func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	f, err := d.GetDump()
 	if errors.Is(err, ErrNoDumps) {
+		d.mu.Unlock()
 		return err
 	}
 	if err != nil {
+		d.mu.Unlock()
 		return fmt.Errorf("Dump search error: %+v", err)
 	}
 	if f == "" {
+		d.mu.Unlock()
 		return nil
 	}
 	data, _, err := d.GetDumpData(f)
 	if err != nil {
+		d.mu.Unlock()
 		return fmt.Errorf("Dump read error: %+v", err)
 	}
+
+	d.mu.Unlock()
+
 	if data != "" {
 		params := ""
 		query := ""
@@ -167,6 +173,10 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 		}
 		log.Printf("INFO: dump sent: %+v\n", f)
 	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	err = d.DeleteDump(f)
 	if err != nil {
 		d.LockedFiles[f] = true
