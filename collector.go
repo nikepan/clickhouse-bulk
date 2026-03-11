@@ -28,6 +28,7 @@ type Table struct {
 	mu            sync.Mutex
 	Sender        Sender
 	TickerChan    *chan struct{}
+	closeOnce     sync.Once
 	lastUpdate    time.Time
 	// todo add Last Error
 }
@@ -152,21 +153,44 @@ func (t *Table) Add(text string) {
 // CleanTable - delete table from map
 func (t *Table) CleanTable() {
 	t.mu.Lock()
-	close(*t.TickerChan)
-	t = nil
+	defer t.mu.Unlock()
+	t.closeOnce.Do(func() {
+		if t.TickerChan != nil {
+			close(*t.TickerChan)
+		}
+	})
 }
 
 // CleanTables - clean unsused tables
 func (c *Collector) CleanTables() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	toDelete := make([]string, 0)
 	for k, t := range c.Tables {
 		if t.lastUpdate.Add(time.Duration(c.CleanInterval) * time.Millisecond).Before(time.Now()) {
 			// table was not updated for CleanInterval - delete that table - otherwise it can cause memLeak
 			t.CleanTable()
-			defer delete(c.Tables, k)
+			toDelete = append(toDelete, k)
 		}
+	}
+	for _, k := range toDelete {
+		delete(c.Tables, k)
+	}
+}
 
+// CleanEmptyTables removes empty tables without racing on the shared map.
+func (c *Collector) CleanEmptyTables() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	toDelete := make([]string, 0)
+	for k, t := range c.Tables {
+		if t.Empty() {
+			t.CleanTable()
+			toDelete = append(toDelete, k)
+		}
+	}
+	for _, k := range toDelete {
+		delete(c.Tables, k)
 	}
 }
 

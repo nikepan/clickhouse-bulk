@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestReadJSONMissingFile(t *testing.T) {
+	var cnf Config
+	assert.NotPanics(t, func() {
+		err := ReadJSON("missing-config.json", &cnf)
+		assert.Error(t, err)
+	})
+}
+
 func TestReadConfig(t *testing.T) {
 	// Test with a non-existent file (should use defaults)
 	cnf, err := ReadConfig("non_existent_config.json")
@@ -71,6 +79,28 @@ func TestConfigFileStructure(t *testing.T) {
 	assert.NotEmpty(t, cnf.Listen)
 	assert.Greater(t, cnf.FlushCount, 0)
 	assert.Greater(t, len(cnf.Clickhouse.Servers), 0)
+}
+
+func TestInvalidFlushInterval(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_bad_config_*.json")
+	assert.Nil(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(`{"flush_interval":0}`)
+	assert.Nil(t, err)
+	assert.Nil(t, tmpFile.Close())
+
+	_, err = ReadConfig(tmpFile.Name())
+	assert.EqualError(t, err, "flush_interval must be greater than 0")
+}
+
+func TestInvalidEnvIntDoesNotOverrideDefault(t *testing.T) {
+	os.Setenv("CLICKHOUSE_FLUSH_INTERVAL", "oops")
+	defer os.Unsetenv("CLICKHOUSE_FLUSH_INTERVAL")
+
+	cnf, err := ReadConfig("non_existent_config.json")
+	assert.Nil(t, err)
+	assert.Equal(t, 1000, cnf.FlushInterval)
 }
 
 func TestTLSConfig(t *testing.T) {

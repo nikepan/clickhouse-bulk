@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -90,15 +91,8 @@ func (server *Server) freeMemHandler(c echo.Context) error {
 
 // manual trigger for cleaning tables
 func (server *Server) tablesCleanHandler(c echo.Context) error {
-	log.Printf("DEBUG: clean tables:\n%+v", server.Collector.Tables)
-	for k, t := range server.Collector.Tables {
-		log.Printf("DEBUG: check if table is empty: %+v with key:%+v\n", t, k)
-		if ok := t.Empty(); ok {
-			log.Printf("DEBUG: delete empty table: %+v with key:%+v\n", t, k)
-			server.Collector.Tables[k].CleanTable()
-			defer delete(server.Collector.Tables, k)
-		}
-	}
+	log.Printf("DEBUG: clean empty tables")
+	server.Collector.CleanEmptyTables()
 	return c.JSON(200, Status{Status: "cleaned empty tables"})
 }
 
@@ -156,22 +150,20 @@ func RunServer(cnf Config) {
 	collect := NewCollector(sender, cnf.FlushCount, cnf.FlushInterval, cnf.CleanInterval, cnf.RemoveQueryID)
 
 	// send collected data on SIGTERM and exit
-	signals := make(chan os.Signal)
+	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
 
 	srv := InitServer(cnf.Listen, collect, cnf.Debug, cnf.LogQueries)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	go func() {
-		for {
-			_ = <-signals
-			log.Printf("STOP signal\n")
-			if err := srv.Shutdown(ctx); err != nil {
-				log.Printf("Shutdown error %+v\n", err)
-				SafeQuit(collect, sender)
-				os.Exit(1)
-			}
+		<-signals
+		log.Printf("STOP signal\n")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Shutdown error %+v\n", err)
+			SafeQuit(collect, sender)
+			os.Exit(1)
 		}
 	}()
 
@@ -181,9 +173,10 @@ func RunServer(cnf Config) {
 
 	log.Printf("Server starting on %s\n", cnf.Listen)
 	err := srv.Start(cnf)
-	if err != nil {
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("ListenAndServe: %+v\n", err)
 		SafeQuit(collect, sender)
 		os.Exit(1)
 	}
+	SafeQuit(collect, sender)
 }

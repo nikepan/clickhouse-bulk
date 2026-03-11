@@ -167,3 +167,29 @@ func TestCollector_FlushAll(t *testing.T) {
 	c.Push(qTitle, qContent)
 	c.FlushAll()
 }
+
+func TestTable_CleanTableDoesNotDeadlock(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000, 1, true)
+	c.Push(escTitle, qContent)
+	table := c.Tables[escTitle]
+	table.CleanTable()
+
+	done := make(chan struct{})
+	go func() {
+		_ = table.GetCount()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("GetCount blocked after CleanTable")
+	}
+}
+
+func TestCollector_CleanEmptyTables(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	c.AddTable("query=test")
+	c.CleanEmptyTables()
+	assert.Empty(t, c.Tables)
+}

@@ -21,6 +21,7 @@ type ClickhouseServer struct {
 	Bad         bool
 	Client      *http.Client
 	LogQueries  bool
+	mu          sync.Mutex
 }
 
 // Clickhouse - main clickhouse sender object
@@ -81,7 +82,7 @@ func (c *Clickhouse) AddServer(url string, logQueries bool) {
 	defer c.mu.Unlock()
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
 		Timeout: time.Second * time.Duration(c.ConnectTimeout), Transport: c.Transport,
-	}, LogQueries: logQueries })
+	}, LogQueries: logQueries})
 }
 
 // DumpServers - dump servers state to prometheus
@@ -91,7 +92,7 @@ func (c *Clickhouse) DumpServers() {
 	good := 0
 	bad := 0
 	for _, s := range c.Servers {
-		if s.Bad {
+		if s.IsBad() {
 			bad++
 		} else {
 			good++
@@ -106,24 +107,29 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	tnow := time.Now()
+	var srvLastRequest time.Time
 	for _, s := range c.Servers {
-		if s.Bad {
-			if tnow.Sub(s.LastRequest) > time.Second*time.Duration(c.DownTimeout) {
-				s.Bad = false
+		lastRequest, bad := s.State()
+		if bad {
+			if tnow.Sub(lastRequest) > time.Second*time.Duration(c.DownTimeout) {
+				s.SetBad(false)
 			} else {
 				continue
 			}
 		}
 		if srv != nil {
-			if srv.LastRequest.Sub(s.LastRequest) > 0 {
+			if srvLastRequest.Sub(lastRequest) > 0 {
 				srv = s
+				srvLastRequest = lastRequest
+				continue
 			}
 		} else {
 			srv = s
+			srvLastRequest = lastRequest
 		}
 	}
 	if srv != nil {
-		srv.LastRequest = time.Now()
+		srv.Touch(time.Now())
 	}
 	return srv
 
@@ -187,6 +193,34 @@ func (c *Clickhouse) WaitFlush() (err error) {
 	return nil
 }
 
+// IsBad reports whether the server is currently marked unavailable.
+func (srv *ClickhouseServer) IsBad() bool {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	return srv.Bad
+}
+
+// SetBad marks the server availability state.
+func (srv *ClickhouseServer) SetBad(bad bool) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	srv.Bad = bad
+}
+
+// Touch records the timestamp of the latest request attempt.
+func (srv *ClickhouseServer) Touch(at time.Time) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	srv.LastRequest = at
+}
+
+// State returns the state required for server selection.
+func (srv *ClickhouseServer) State() (lastRequest time.Time, bad bool) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	return srv.LastRequest, srv.Bad
+}
+
 // SendQuery - sends query to server and return result
 func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
 	if srv.URL != "" {
@@ -199,7 +233,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		}
 		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
 		if err != nil {
-			srv.Bad = true
+			srv.SetBad(true)
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
 		defer resp.Body.Close()
@@ -209,7 +243,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		buf, _ := io.ReadAll(resp.Body)
 		s := string(buf)
 		if resp.StatusCode >= 502 {
-			srv.Bad = true
+			srv.SetBad(true)
 			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
 			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)

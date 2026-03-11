@@ -42,7 +42,7 @@ func (d *FileDumper) checkDir(create bool) error {
 	_, err := os.Stat(d.Path)
 	if os.IsNotExist(err) {
 		if create {
-			return os.Mkdir(d.Path, 0766)
+			return os.MkdirAll(d.Path, 0766)
 		}
 	}
 	return err
@@ -57,6 +57,7 @@ func NewDumper(path string) *FileDumper {
 	d := new(FileDumper)
 	d.Path = path
 	d.DumpPrefix = time.Now().Format("20060102150405")
+	d.LockedFiles = make(map[string]bool)
 	return d
 }
 
@@ -177,7 +178,6 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 
 // Listen - reads dumps from disk and try to send it
 func (d *FileDumper) Listen(sender Sender, interval int) {
-	d.LockedFiles = make(map[string]bool)
 	if interval == 0 {
 		interval = defaultDumpCheckInterval
 	}
