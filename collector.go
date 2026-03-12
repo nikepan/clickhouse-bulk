@@ -251,8 +251,8 @@ func (c *Collector) AddTable(name string) {
 }
 
 func (c *Collector) separateQuery(name string) (query string, params string) {
-	items := strings.Split(name, "&")
-	for _, p := range items {
+	items := strings.SplitSeq(name, "&")
+	for p := range items {
 		if HasPrefix(p, "query=") {
 			query = p[6:]
 		} else {
@@ -296,8 +296,8 @@ func (c *Collector) Push(paramsIn string, content string) {
 	// otherwise every query will be threated as unique thus it will consume more memory
 	params := ""
 	if c.RemoveQueryID {
-		items := strings.Split(paramsIn, "&")
-		for _, p := range items {
+		items := strings.SplitSeq(paramsIn, "&")
+		for p := range items {
 			if !HasPrefix(p, "query_id=") {
 				params += "&" + p
 			}

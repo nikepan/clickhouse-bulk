@@ -165,7 +165,7 @@ func (c *Clickhouse) Empty() bool {
 // Run server
 func (c *Clickhouse) Run() {
 	var err error
-	var datas []interface{}
+	var datas []any
 	for {
 		datas, err = c.Queue.Poll(1, time.Second*5)
 		if err == nil {

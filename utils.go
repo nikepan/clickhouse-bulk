@@ -63,7 +63,7 @@ func defaultConfig() Config {
 }
 
 // ReadJSON - read json file to struct
-func ReadJSON(fn string, v interface{}) error {
+func ReadJSON(fn string, v any) error {
 	file, err := os.Open(fn)
 	if err != nil {
 		return err

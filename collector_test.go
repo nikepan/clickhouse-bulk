@@ -31,14 +31,14 @@ var escParamsAndSelect = qParams + "&query=" + escSelect
 
 func BenchmarkCollector_Push(t *testing.B) {
 	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
-	for i := 0; i < 30000; i++ {
+	for range 30000 {
 		c.Push(escTitle, qContent)
 	}
 }
 
 func TestCollector_Push(t *testing.T) {
 	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
-	for i := 0; i < 10400; i++ {
+	for range 10400 {
 		c.Push(escTitle, qContent)
 	}
 	assert.Equal(t, 400, c.Tables[escTitle].GetCount())
