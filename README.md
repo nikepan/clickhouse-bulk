@@ -142,6 +142,39 @@ INSERT INTO t (a,b) VALUES ('1','2')('3','4')
 - Set `remove_query_id: true` if the driver sends `query_id` (breaks batching).
 - Tune `send_max_rps` when ClickHouse or journal backlog cannot keep up.
 
+## Release CI (tags `*.*.*`)
+
+### GitHub Release 403
+
+If GoReleaser fails with `403 Resource not accessible by integration` on release upload:
+
+1. **Settings → Actions → General → Workflow permissions** → **Read and write permissions** (not read-only).
+2. Re-run the workflow after pushing an updated `release.yml` (needs `permissions: contents: write`).
+3. Or create a [classic PAT](https://github.com/settings/tokens) with scope **`repo`**, add secret **`GH_PAT`**, re-run.
+
+Delete a broken draft release on GitHub (**Releases**) before re-tagging if a previous run left a partial release.
+
+### Docker Hub
+
+Repository **Secrets** (Settings → Secrets and variables → Actions):
+
+| Name | Required | Example | Purpose |
+|------|----------|---------|---------|
+| `DOCKERHUB_TOKEN` | **yes** | *(token)* | [Docker Hub access token](https://hub.docker.com/settings/security) |
+| `DOCKERHUB_USERNAME` | no | `itcrow` | Hub login; if unset, CI uses GitHub org name (`repository_owner`) |
+
+Docker images are published as `itcrow/clickhouse-bulk` — Hub user must match (org `itcrow` or override via `DOCKERHUB_USERNAME`).
+
+### CI build (optional Codacy)
+
+Tests always run on push/PR. Codacy upload runs only if secret **`CODACY_PROJECT_TOKEN`** is set.
+
+If upload fails with `Request URL not found`:
+
+1. Add the repository at [Codacy](https://app.codacy.com) (org `itcrow`, repo `clickhouse-bulk`).
+2. **Settings → Integrations → Repository API** → generate a **Project API token** for this repo.
+3. Put it in GitHub secret `CODACY_PROJECT_TOKEN`, or **delete** the secret to skip Codacy entirely.
+
 ## Installation
 
 - [Releases](https://github.com/itcrow/clickhouse-bulk/releases)

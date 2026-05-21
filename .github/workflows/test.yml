@@ -27,7 +27,11 @@ jobs:
     - name: Coverage
       run: go test -v -race -covermode=atomic -coverprofile=coverage.out
 
+    # Optional: add repo at https://app.codacy.com, then set secret CODACY_PROJECT_TOKEN.
+    # "Request URL not found" usually means wrong token or project not linked to this repository.
     - name: Upload coverage to Codacy
+      if: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
+      continue-on-error: true
       run: |
         curl -Ls https://coverage.codacy.com/get.sh > codacy-coverage-reporter.sh
         chmod +x codacy-coverage-reporter.sh
