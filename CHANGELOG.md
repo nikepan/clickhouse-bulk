@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Go **1.26.3**; dependencies updated (echo v4.15.2, prometheus client_golang v1.23.2, testify v1.11.1, golang.org/x/*).
 - Go module: `github.com/itcrow/clickhouse-bulk` (was `github.com/nikepan/clickhouse-bulk`).
 - `RunServer` builds per-target senders; backup wrapped in `DualSender`.
 - Journal ack when live stores batch (CH **or** `dump_dir`), not backup-only.

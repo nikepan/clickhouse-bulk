@@ -146,7 +146,7 @@ INSERT INTO t (a,b) VALUES ('1','2')('3','4')
 
 - [Releases](https://github.com/itcrow/clickhouse-bulk/releases)
 - [Docker](https://hub.docker.com/r/itcrow/clickhouse-bulk/)
-- From source (Go 1.24+): `go build`
+- From source (Go 1.26+): `go build`
 
 ## License
 
