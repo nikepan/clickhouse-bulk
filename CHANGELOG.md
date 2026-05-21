@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Dependabot: `.github/dependabot.yml` (gomod, github-actions, docker; weekly).
 - **Live / backup dual-write** when `clickhouse-backup.servers` or `CLICKHOUSE_BACKUP_SERVERS` is set.
 - `DualSender`, separate queues, dumps (`dump_dir`, `bkp_dump_dir`), and replay loops.
 - **Journal (WAL):** `journal_dir`, `journal_fsync`, `max_journal_pending`; ack on live send or live dump; replay on startup; metrics `ch_journal_pending`, `ch_journal_dir_bytes`.
