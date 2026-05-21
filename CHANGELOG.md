@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Go module: `github.com/itcrow/clickhouse-bulk` (was `github.com/nikepan/clickhouse-bulk`).
 - `RunServer` builds per-target senders; backup wrapped in `DualSender`.
 - Journal ack when live stores batch (CH **or** `dump_dir`), not backup-only.
 

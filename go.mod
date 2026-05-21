@@ -1,4 +1,4 @@
-module github.com/nikepan/clickhouse-bulk
+module github.com/itcrow/clickhouse-bulk
 
 require (
 	github.com/labstack/echo/v4 v4.13.4

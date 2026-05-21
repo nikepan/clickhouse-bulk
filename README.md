@@ -1,7 +1,7 @@
 # ClickHouse-Bulk (live / standby fork)
 
-[![build](https://github.com/nikepan/clickhouse-bulk/actions/workflows/test.yml/badge.svg)](https://github.com/nikepan/clickhouse-bulk/actions/workflows/test.yml)
-[![download binaries](https://img.shields.io/badge/binaries-download-blue.svg)](https://github.com/nikepan/clickhouse-bulk/releases)
+[![build](https://github.com/itcrow/clickhouse-bulk/actions/workflows/test.yml/badge.svg)](https://github.com/itcrow/clickhouse-bulk/actions/workflows/test.yml)
+[![download binaries](https://img.shields.io/badge/binaries-download-blue.svg)](https://github.com/itcrow/clickhouse-bulk/releases)
 
 HTTP insert collector for [ClickHouse](https://clickhouse.com/). Batches INSERTs and sends them to one or two ClickHouse endpoints (live + optional standby).
 
@@ -144,8 +144,8 @@ INSERT INTO t (a,b) VALUES ('1','2')('3','4')
 
 ## Installation
 
-- [Releases](https://github.com/nikepan/clickhouse-bulk/releases)
-- [Docker](https://hub.docker.com/r/nikepan/clickhouse-bulk/)
+- [Releases](https://github.com/itcrow/clickhouse-bulk/releases)
+- [Docker](https://hub.docker.com/r/itcrow/clickhouse-bulk/)
 - From source (Go 1.24+): `go build`
 
 ## License
