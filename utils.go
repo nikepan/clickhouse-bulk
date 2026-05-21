@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -12,28 +13,45 @@ const sampleConfig = "config.sample.json"
 
 type clickhouseConfig struct {
 	Servers        []string `json:"servers"`
+	QueryParams    string   `json:"query_params"`
 	TLSServerName  string   `json:"tls_server_name"`
 	TLSSkipVerify  bool     `json:"insecure_tls_skip_verify"`
-	DownTimeout    int      `json:"down_timeout"`
-	ConnectTimeout int      `json:"connect_timeout"`
+	DownTimeout    int `json:"down_timeout"`
+	ConnectTimeout int `json:"connect_timeout"`
+	SendMaxRPS     int `json:"send_max_rps"`
+	SendMaxBurst   int `json:"send_max_burst"`
 }
 
 // Config stores config data
 type Config struct {
-	Listen            string           `json:"listen"`
-	Clickhouse        clickhouseConfig `json:"clickhouse"`
-	FlushCount        int              `json:"flush_count"`
-	FlushInterval     int              `json:"flush_interval"`
-	CleanInterval     int              `json:"clean_interval"`
-	RemoveQueryID     bool             `json:"remove_query_id"`
-	DumpCheckInterval int              `json:"dump_check_interval"`
-	DumpDir           string           `json:"dump_dir"`
-	Debug             bool             `json:"debug"`
-	LogQueries        bool             `json:"log_queries"`
-	MetricsPrefix     string           `json:"metrics_prefix"`
-	UseTLS            bool             `json:"use_tls"`
-	TLSCertFile       string           `json:"tls_cert_file"`
-	TLSKeyFile        string           `json:"tls_key_file"`
+	Listen            string            `json:"listen"`
+	Clickhouse        clickhouseConfig  `json:"clickhouse"`
+	ClickhouseBackup  *clickhouseConfig `json:"clickhouse-backup"`
+	FlushCount        int               `json:"flush_count"`
+	FlushInterval     int               `json:"flush_interval"`
+	CleanInterval     int               `json:"clean_interval"`
+	RemoveQueryID     bool              `json:"remove_query_id"`
+	DumpCheckInterval    int `json:"dump_check_interval"`
+	BkpDumpCheckInterval int `json:"bkp_dump_check_interval"`
+	DumpReplayBatch      int `json:"dump_replay_batch"`
+	MaxDumpFiles         int `json:"max_dump_files"`
+	DumpDir              string `json:"dump_dir"`
+	BkpDumpDir           string `json:"bkp_dump_dir"`
+	JournalDir           string `json:"journal_dir"`
+	JournalFsync         bool   `json:"journal_fsync"`
+	MaxJournalPending    int    `json:"max_journal_pending"`
+	ShutdownDrainSec     int    `json:"shutdown_drain_sec"`
+	Debug             bool              `json:"debug"`
+	LogQueries        bool              `json:"log_queries"`
+	MetricsPrefix     string            `json:"metrics_prefix"`
+	UseTLS            bool              `json:"use_tls"`
+	TLSCertFile       string            `json:"tls_cert_file"`
+	TLSKeyFile        string            `json:"tls_key_file"`
+}
+
+// BackupEnabled reports whether live/backup dual-write mode is active.
+func (c Config) BackupEnabled() bool {
+	return c.ClickhouseBackup != nil && len(c.ClickhouseBackup.Servers) > 0
 }
 
 func defaultConfig() Config {
@@ -45,6 +63,9 @@ func defaultConfig() Config {
 		RemoveQueryID:     true,
 		DumpCheckInterval: 300,
 		DumpDir:           "dumps",
+		ShutdownDrainSec:  60,
+		JournalDir:        "",
+		JournalFsync:      false,
 		Debug:             false,
 		LogQueries:        false,
 		MetricsPrefix:     "",
@@ -107,6 +128,64 @@ func readEnvString(name string, value *string) {
 	}
 }
 
+func splitTrimServers(list string) []string {
+	parts := strings.Split(list, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func normalizeServerList(servers []string) []string {
+	out := make([]string, 0, len(servers))
+	for _, s := range servers {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func mergeQueryParams(base, extra string) string {
+	base = strings.TrimSpace(base)
+	extra = strings.TrimSpace(extra)
+	if extra == "" {
+		return base
+	}
+	if base == "" {
+		return extra
+	}
+	return base + "&" + extra
+}
+
+func validateClickhouseConfig(name string, ch clickhouseConfig) error {
+	if len(ch.Servers) == 0 {
+		return fmt.Errorf("%s: no servers configured", name)
+	}
+	for _, u := range ch.Servers {
+		if strings.TrimSpace(u) == "" {
+			return fmt.Errorf("%s: empty server URL in servers list", name)
+		}
+	}
+	return nil
+}
+
+func ensureBackupConfig(cnf *Config) *clickhouseConfig {
+	if cnf.ClickhouseBackup == nil {
+		cnf.ClickhouseBackup = &clickhouseConfig{
+			DownTimeout:    cnf.Clickhouse.DownTimeout,
+			ConnectTimeout: cnf.Clickhouse.ConnectTimeout,
+			TLSServerName:  cnf.Clickhouse.TLSServerName,
+			TLSSkipVerify:  cnf.Clickhouse.TLSSkipVerify,
+		}
+	}
+	return cnf.ClickhouseBackup
+}
 
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {
@@ -130,8 +209,19 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("CLICKHOUSE_CLEAN_INTERVAL", &cnf.CleanInterval)
 	readEnvBool("CLICKHOUSE_REMOVE_QUERY_ID", &cnf.RemoveQueryID)
 	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
+	readEnvInt("BKP_DUMP_CHECK_INTERVAL", &cnf.BkpDumpCheckInterval)
+	readEnvInt("DUMP_REPLAY_BATCH", &cnf.DumpReplayBatch)
+	readEnvInt("MAX_DUMP_FILES", &cnf.MaxDumpFiles)
+	readEnvString("DUMP_DIR", &cnf.DumpDir)
+	readEnvString("CLICKHOUSE_BKP_DUMP_DIR", &cnf.BkpDumpDir)
+	readEnvInt("SHUTDOWN_DRAIN_SEC", &cnf.ShutdownDrainSec)
+	readEnvString("JOURNAL_DIR", &cnf.JournalDir)
+	readEnvBool("JOURNAL_FSYNC", &cnf.JournalFsync)
+	readEnvInt("MAX_JOURNAL_PENDING", &cnf.MaxJournalPending)
 	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
+	readEnvInt("CLICKHOUSE_SEND_MAX_RPS", &cnf.Clickhouse.SendMaxRPS)
+	readEnvInt("CLICKHOUSE_SEND_MAX_BURST", &cnf.Clickhouse.SendMaxBurst)
 	readEnvString("CLICKHOUSE_TLS_SERVER_NAME", &cnf.Clickhouse.TLSServerName)
 	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.TLSSkipVerify)
 	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
@@ -139,9 +229,42 @@ func ReadConfig(configFile string) (Config, error) {
 
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")
 	if serversList != "" {
-		cnf.Clickhouse.Servers = strings.Split(serversList, ",")
+		cnf.Clickhouse.Servers = splitTrimServers(serversList)
+	}
+	cnf.Clickhouse.Servers = normalizeServerList(cnf.Clickhouse.Servers)
+
+	backupServers := os.Getenv("CLICKHOUSE_BACKUP_SERVERS")
+	if backupServers != "" {
+		bkp := ensureBackupConfig(&cnf)
+		bkp.Servers = splitTrimServers(backupServers)
+	}
+	if cnf.BackupEnabled() {
+		bkp := ensureBackupConfig(&cnf)
+		bkp.Servers = normalizeServerList(bkp.Servers)
+		readEnvInt("CLICKHOUSE_BACKUP_DOWN_TIMEOUT", &bkp.DownTimeout)
+		readEnvInt("CLICKHOUSE_BACKUP_CONNECT_TIMEOUT", &bkp.ConnectTimeout)
+		readEnvString("CLICKHOUSE_BACKUP_TLS_SERVER_NAME", &bkp.TLSServerName)
+		readEnvBool("CLICKHOUSE_BACKUP_INSECURE_TLS_SKIP_VERIFY", &bkp.TLSSkipVerify)
+		readEnvString("CLICKHOUSE_BACKUP_QUERY_PARAMS", &bkp.QueryParams)
+		readEnvInt("CLICKHOUSE_BACKUP_SEND_MAX_RPS", &bkp.SendMaxRPS)
+		readEnvInt("CLICKHOUSE_BACKUP_SEND_MAX_BURST", &bkp.SendMaxBurst)
+	}
+
+	if err := validateClickhouseConfig("clickhouse", cnf.Clickhouse); err != nil {
+		return Config{}, err
+	}
+	if cnf.BackupEnabled() {
+		if err := validateClickhouseConfig("clickhouse-backup", *cnf.ClickhouseBackup); err != nil {
+			return Config{}, err
+		}
+	}
+	if cnf.ShutdownDrainSec <= 0 {
+		cnf.ShutdownDrainSec = 60
 	}
 
 	log.Printf("Using servers: %+v", strings.Join(cnf.Clickhouse.Servers, ", "))
+	if cnf.BackupEnabled() {
+		log.Printf("Using backup servers: %+v", strings.Join(cnf.ClickhouseBackup.Servers, ", "))
+	}
 	return cnf, nil
 }

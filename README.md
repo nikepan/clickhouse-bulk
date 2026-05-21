@@ -1,111 +1,153 @@
-# ClickHouse-Bulk
+# ClickHouse-Bulk (live / standby fork)
 
 [![build](https://github.com/nikepan/clickhouse-bulk/actions/workflows/test.yml/badge.svg)](https://github.com/nikepan/clickhouse-bulk/actions/workflows/test.yml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/e25b965fe6094daa88cfb23968adefa4)](https://app.codacy.com/gh/nikepan/clickhouse-bulk/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 [![download binaries](https://img.shields.io/badge/binaries-download-blue.svg)](https://github.com/nikepan/clickhouse-bulk/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/nikepan/clickhouse-bulk)](https://goreportcard.com/report/github.com/nikepan/clickhouse-bulk)
-[![godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/nikepan/clickhouse-bulk)
 
-Simple [Yandex ClickHouse](https://clickhouse.yandex/) insert collector. It collect requests and send to ClickHouse servers.
+HTTP insert collector for [ClickHouse](https://clickhouse.com/). Batches INSERTs and sends them to one or two ClickHouse endpoints (live + optional standby).
 
+Based on [nikepan/clickhouse-bulk](https://github.com/nikepan/clickhouse-bulk) with **dual-write**, **journal (WAL)**, separate dumps, and extended metrics.
 
-### Installation
+## Features
 
-[Download binary](https://github.com/nikepan/clickhouse-bulk/releases) for you platorm
+- Batch by query key (`flush_count`, `flush_interval`)
+- Multiple servers per target with failover
+- **Live + backup** async dual-write (`clickhouse-backup`)
+- **Journal** — durable HTTP `200` before ClickHouse (`journal_dir`)
+- On failure — spool to `dump_dir` / `bkp_dump_dir` with automatic replay
+- 4xx batches → `failed/` (no infinite retry)
+- **Send rate limit** per target (`send_max_rps`)
+- Prometheus metrics + `GET /status`
+- Graceful shutdown with queue drain
 
-or
+## Quick start
 
-[Use docker image](https://hub.docker.com/r/nikepan/clickhouse-bulk/)
-
-
-or from sources (Go 1.23+):
-
-```text
-git clone https://github.com/nikepan/clickhouse-bulk
-cd clickhouse-bulk
+```bash
+cp config.sample.json config.json   # live + journal
+# or: cp config.sample-backup.json config.json
 go build
+./clickhouse-bulk -config config.json
 ```
 
+Send INSERTs to `http://127.0.0.1:8124` (not the native ClickHouse port unless you proxy).
 
-### Features
-- Group n requests and send to any of ClickHouse server
-- Sending collected data by interval
-- Tested with VALUES, TabSeparated formats
-- Supports many servers to send
-- Supports query in query parameters and in body
-- Supports other query parameters like username, password, database
-- Supports basic authentication
+## Documentation
 
+| Doc | Contents |
+|-----|----------|
+| [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md) | Architecture, journal, dumps, guarantees |
+| [docs/RISKS.md](docs/RISKS.md) | Operational risks by mode (live / journal / dual-write) |
+| [docs/CONFIG.md](docs/CONFIG.md) | Full config and env reference |
+| [docs/ALERTS.md](docs/ALERTS.md) | Prometheus alert examples |
+| [CHANGELOG.md](CHANGELOG.md) | Change history |
+| [Plan.md](Plan.md) | Known issues / roadmap |
 
-For example:
-```sql
-INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')
-INSERT INTO table3 (c1, c2, c3) VALUES ('v4', 'v5', 'v6')
-```
-sends as
-```sql
-INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
-```
+## Modes
 
+### Live only (default sample)
 
-### Options
-- -config - config file (json); default _config.json_
+`config.sample.json` — one ClickHouse, optional journal, no backup.
 
+### Live + backup
 
-### Configuration file
-```json lines
-{
-  "listen": ":8124",
-  "flush_count": 10000, // check by \n char
-  "flush_interval": 1000, // milliseconds
-  "clean_interval": 0, // how often cleanup internal tables - e.g. inserts to different temporary tables, or as workaround for query_id etc. milliseconds
-  "remove_query_id": true, // some drivers sends query_id which prevents inserts to be batched
-  "dump_check_interval": 300, // interval for try to send dumps (seconds); -1 to disable
-  "debug": false, // log incoming requests
-  "dump_dir": "dumps", // directory for dump unsended data (if clickhouse errors)
-  "clickhouse": {
-    "down_timeout": 60, // wait if server in down (seconds)
-    "connect_timeout": 10, // wait for server connect (seconds)
-    "tls_server_name": "", // override TLS serverName for certificate verification (e.g. in cases you share same "cluster" certificate across multiple nodes)
-    "insecure_tls_skip_verify": false, // INSECURE - skip certificate verification at all
-    "servers": [
-      "http://127.0.0.1:8123"
-    ]
-  },
-  "metrics_prefix": "prefix"
+`config.sample-backup.json` or:
+
+```json
+"clickhouse-backup": {
+  "servers": ["http://standby:8123"],
+  "query_params": "database=standby"
 }
 ```
 
-### Environment variables (used for docker image)
+Each batch: live queue first, then backup queue. Separate dumps and replay intervals.
 
-* `CLICKHOUSE_BULK_DEBUG` - enable debug logging
-* `CLICKHOUSE_SERVERS` - comma separated list of servers
-* `CLICKHOUSE_FLUSH_COUNT` - count of rows for insert
-* `CLICKHOUSE_FLUSH_INTERVAL` - insert interval
-* `CLICKHOUSE_CLEAN_INTERVAL` - internal tables clean interval
-* `DUMP_CHECK_INTERVAL` - interval of resend dumps
-* `CLICKHOUSE_DOWN_TIMEOUT` - wait time if server is down
-* `CLICKHOUSE_CONNECT_TIMEOUT` - clickhouse server connect timeout
-* `CLICKHOUSE_TLS_SERVER_NAME` - server name for TLS certificate verification
-* `CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY` - skip certificate verification at all
-* `METRICS_PREFIX` - prefix for prometheus metrics
+### Journal off
 
-### Quickstart
+Set `"journal_dir": ""` or unset — legacy behavior (HTTP `200` before in-memory accept only).
 
-`./clickhouse-bulk`
-and send queries to :8124
+## Configuration (summary)
 
-### Metrics
-manual check main metrics
-`curl -s http://127.0.0.1:8124/metrics | grep "^ch_"`
-* `ch_bad_servers 0` - actual count of bad servers
-* `ch_dump_count 0` - dumps saved from launch
-* `ch_queued_dumps 0` - actual dump files id directory
-* `ch_good_servers 1` - actual good servers count
-* `ch_received_count 40` - received requests count from launch
-* `ch_sent_count 1` - sent request count from launch
+```json
+{
+  "listen": ":8124",
+  "flush_count": 10000,
+  "flush_interval": 1000,
+  "dump_dir": "dumps",
+  "dump_check_interval": 300,
+  "dump_replay_batch": 10,
+  "journal_dir": "journal",
+  "max_journal_pending": 1000000,
+  "shutdown_drain_sec": 60,
+  "clickhouse": {
+    "servers": ["http://127.0.0.1:8123"],
+    "send_max_rps": 0,
+    "send_max_burst": 0
+  }
+}
+```
 
+See [docs/CONFIG.md](docs/CONFIG.md) for all keys and environment variables.
 
-### Tips
+## Environment variables (Docker)
 
-For better performance words FORMAT and VALUES must be uppercase.
+Common overrides:
+
+| Variable | Purpose |
+|----------|---------|
+| `CLICKHOUSE_SERVERS` | Live URLs (comma-separated) |
+| `CLICKHOUSE_BACKUP_SERVERS` | Enable backup + URLs |
+| `JOURNAL_DIR` | WAL path (`""` disables) |
+| `MAX_JOURNAL_PENDING` | WAL backlog cap (503 when full) |
+| `CLICKHOUSE_SEND_MAX_RPS` | Live send rate limit |
+| `CLICKHOUSE_BACKUP_SEND_MAX_RPS` | Backup send rate limit |
+| `DUMP_DIR` / `CLICKHOUSE_BKP_DUMP_DIR` | Dump directories |
+| `SHUTDOWN_DRAIN_SEC` | Shutdown drain timeout |
+
+Full list: [docs/CONFIG.md](docs/CONFIG.md).
+
+## Metrics
+
+```bash
+curl -s http://127.0.0.1:8124/metrics | grep '^ch_'
+```
+
+| Metric | Description |
+|--------|-------------|
+| `ch_received_count` | HTTP inserts received |
+| `ch_sent_count` / `ch_bkp_sent_count` | Batches sent per target |
+| `ch_send_queue` / `ch_bkp_send_queue` | Sender queue depth |
+| `ch_queued_dumps` / `ch_bkp_queued_dumps` | Pending dump files |
+| `ch_dump_dir_bytes` / `ch_bkp_dump_dir_bytes` | Dump dir size on disk |
+| `ch_journal_pending` | Unacked WAL rows (if journal on) |
+| `ch_journal_dir_bytes` | Journal dir size |
+| `ch_last_sent_unixtime` / `ch_bkp_last_sent_unixtime` | Last successful send |
+
+`GET /status` — live/backup health JSON.
+
+## Example batching
+
+```sql
+INSERT INTO t (a,b) VALUES ('1','2')
+INSERT INTO t (a,b) VALUES ('3','4')
+```
+
+→ one POST to ClickHouse:
+
+```sql
+INSERT INTO t (a,b) VALUES ('1','2')('3','4')
+```
+
+## Tips
+
+- Use uppercase `FORMAT` and `VALUES` for best performance.
+- Set `remove_query_id: true` if the driver sends `query_id` (breaks batching).
+- Tune `send_max_rps` when ClickHouse or journal backlog cannot keep up.
+
+## Installation
+
+- [Releases](https://github.com/nikepan/clickhouse-bulk/releases)
+- [Docker](https://hub.docker.com/r/nikepan/clickhouse-bulk/)
+- From source (Go 1.24+): `go build`
+
+## License
+
+See [LICENSE](LICENSE). Upstream: v1.3.9.

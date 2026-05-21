@@ -5,16 +5,17 @@
   "clean_interval": 0,
   "remove_query_id": true,
   "dump_check_interval": 300,
-  "bkp_dump_check_interval": 0,
+  "bkp_dump_check_interval": 600,
   "dump_replay_batch": 10,
-  "max_dump_files": 0,
+  "max_dump_files": 10000,
+  "shutdown_drain_sec": 60,
   "debug": false,
   "log_queries": true,
   "dump_dir": "dumps",
   "journal_dir": "journal",
   "journal_fsync": false,
+  "bkp_dump_dir": "dumps-bkp",
   "max_journal_pending": 1000000,
-  "shutdown_drain_sec": 60,
   "clickhouse": {
     "down_timeout": 60,
     "connect_timeout": 10,
@@ -24,6 +25,18 @@
     "send_max_burst": 0,
     "servers": [
       "http://127.0.0.1:8123"
+    ]
+  },
+  "clickhouse-backup": {
+    "down_timeout": 60,
+    "connect_timeout": 10,
+    "tls_server_name": "",
+    "insecure_tls_skip_verify": false,
+    "query_params": "database=standby",
+    "send_max_rps": 0,
+    "send_max_burst": 0,
+    "servers": [
+      "http://127.0.0.2:8123"
     ]
   },
   "use_tls": false,

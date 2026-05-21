@@ -22,6 +22,7 @@ type Table struct {
 	Query         string
 	Params        string
 	Rows          []string
+	JournalIDs    []uint64
 	count         int
 	FlushCount    int
 	FlushInterval int
@@ -41,6 +42,7 @@ type Collector struct {
 	CleanInterval int
 	RemoveQueryID bool
 	Sender        Sender
+	Journal       *Journal
 	TickerChan    *chan struct{}
 }
 
@@ -55,9 +57,10 @@ func NewTable(name string, sender Sender, count int, interval int) (t *Table) {
 }
 
 // NewCollector - default collector constructor
-func NewCollector(sender Sender, count int, interval int, cleanInterval int, removeQueryID bool) (c *Collector) {
+func NewCollector(sender Sender, journal *Journal, count int, interval int, cleanInterval int, removeQueryID bool) (c *Collector) {
 	c = new(Collector)
 	c.Sender = sender
+	c.Journal = journal
 	c.Tables = make(map[string]*Table)
 	c.Count = count
 	c.FlushInterval = interval
@@ -78,18 +81,33 @@ func (t *Table) Content() string {
 	return t.Query + "\n" + strings.Join(t.Rows, rowDelimiter)
 }
 
+// doFlush sends the current batch; caller must hold t.mu.
+func (t *Table) doFlush() {
+	if t.count == 0 {
+		return
+	}
+	req := ClickhouseRequest{
+		Params:     t.Params,
+		Query:      t.Query,
+		Content:    t.Content(),
+		Count:      len(t.Rows),
+		JournalIDs: append([]uint64(nil), t.JournalIDs...),
+		isInsert:   true,
+	}
+	sender := t.Sender
+	t.Rows = make([]string, 0, t.FlushCount)
+	t.JournalIDs = nil
+	t.count = 0
+	t.mu.Unlock()
+	sender.Send(&req)
+	t.mu.Lock()
+}
+
 // Flush - sends collected data in table to clickhouse
 func (t *Table) Flush() {
-	req := ClickhouseRequest{
-		Params:   t.Params,
-		Query:    t.Query,
-		Content:  t.Content(),
-		Count:    len(t.Rows),
-		isInsert: true,
-	}
-	t.Sender.Send(&req)
-	t.Rows = make([]string, 0, t.FlushCount)
-	t.count = 0
+	t.mu.Lock()
+	t.doFlush()
+	t.mu.Unlock()
 }
 
 // CheckFlush - check if flush is need and sends data to clickhouse
@@ -97,7 +115,7 @@ func (t *Table) CheckFlush() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.count > 0 {
-		t.Flush()
+		t.doFlush()
 		return true
 	}
 	return false
@@ -134,39 +152,47 @@ func (t *Table) RunTimer() *chan struct{} {
 }
 
 // Add - Adding query to table
-func (t *Table) Add(text string) {
+func (t *Table) Add(text string, journalID uint64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.count++
+	if journalID > 0 {
+		t.JournalIDs = append(t.JournalIDs, journalID)
+	}
 	if t.Format == "TabSeparated" {
 		t.Rows = append(t.Rows, strings.Split(text, "\n")...)
 	} else {
 		t.Rows = append(t.Rows, text)
 	}
 	if len(t.Rows) >= t.FlushCount {
-		t.Flush()
+		t.doFlush()
 	}
 	t.lastUpdate = time.Now()
 }
 
-// CleanTable - delete table from map
+// CleanTable stops the table timer; caller must remove the table from the collector map.
 func (t *Table) CleanTable() {
 	t.mu.Lock()
-	close(*t.TickerChan)
-	t = nil
+	defer t.mu.Unlock()
+	if t.TickerChan != nil {
+		close(*t.TickerChan)
+		t.TickerChan = nil
+	}
 }
 
 // CleanTables - clean unsused tables
 func (c *Collector) CleanTables() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	var remove []string
 	for k, t := range c.Tables {
 		if t.lastUpdate.Add(time.Duration(c.CleanInterval) * time.Millisecond).Before(time.Now()) {
-			// table was not updated for CleanInterval - delete that table - otherwise it can cause memLeak
 			t.CleanTable()
-			defer delete(c.Tables, k)
+			remove = append(remove, k)
 		}
-
+	}
+	for _, k := range remove {
+		delete(c.Tables, k)
 	}
 }
 
@@ -267,7 +293,7 @@ func (c *Collector) addTable(name string) *Table {
 }
 
 // Push - adding query to collector with query params (with query) and rows
-func (c *Collector) Push(paramsIn string, content string) {
+func (c *Collector) Push(paramsIn string, content string, journalID uint64) {
 	// as we are using all params as a table key, we have to remove query_id
 	// otherwise every query will be threated as unique thus it will consume more memory
 	params := ""
@@ -287,7 +313,7 @@ func (c *Collector) Push(paramsIn string, content string) {
 	c.mu.RLock()
 	table, ok := c.Tables[params]
 	if ok {
-		table.Add(content)
+		table.Add(content, journalID)
 		c.mu.RUnlock()
 		pushCounter.Inc()
 		return
@@ -298,7 +324,7 @@ func (c *Collector) Push(paramsIn string, content string) {
 	if !ok {
 		table = c.addTable(params)
 	}
-	table.Add(content)
+	table.Add(content, journalID)
 	c.mu.Unlock()
 	pushCounter.Inc()
 }

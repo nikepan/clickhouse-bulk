@@ -19,8 +19,8 @@ import (
 
 func TestRunServer(t *testing.T) {
 	cnf, _ := ReadConfig("wrong_config.json")
-	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
-	server := InitServer("", collector, false, true)
+	collector := NewCollector(&fakeSender{}, nil, 1000, 1000, 0, true)
+	server := InitServer("", collector, nil, nil, nil, nil, false, false, true)
 	go server.Start(cnf)
 	server.echo.POST("/", server.writeHandler)
 
@@ -71,13 +71,13 @@ func TestRunServer(t *testing.T) {
 
 func TestServer_SafeQuit(t *testing.T) {
 	sender := &fakeSender{}
-	collect := NewCollector(sender, 1000, 1000, 0, true)
+	collect := NewCollector(sender, nil, 1000, 1000, 0, true)
 	collect.AddTable("test")
-	collect.Push("sss", "sss")
+	collect.Push("sss", "sss", 0)
 
 	assert.False(t, collect.Empty())
 
-	SafeQuit(collect, sender)
+	SafeQuit(collect, sender, 60)
 
 	assert.True(t, collect.Empty())
 	assert.True(t, sender.Empty())
@@ -106,18 +106,18 @@ func TestServer_MultiServer(t *testing.T) {
 	}))
 	defer s2.Close()
 
-	sender := NewClickhouse(10, 10, "", false)
+	sender := NewClickhouse(10, 10, "", false, 0, 0)
 	sender.AddServer(s1.URL, true)
 	sender.AddServer(s2.URL, true)
-	collect := NewCollector(sender, 1000, 1000, 0, true)
+	collect := NewCollector(sender, nil, 1000, 1000, 0, true)
 	collect.AddTable("test")
-	collect.Push("eee", "eee")
-	collect.Push("fff", "fff")
-	collect.Push("ggg", "ggg")
+	collect.Push("eee", "eee", 0)
+	collect.Push("fff", "fff", 0)
+	collect.Push("ggg", "ggg", 0)
 
 	assert.False(t, collect.Empty())
 
-	SafeQuit(collect, sender)
+	SafeQuit(collect, sender, 60)
 	time.Sleep(100) // wait for http servers process requests
 
 	assert.Equal(t, 3, len(received))

@@ -11,7 +11,7 @@ import (
 )
 
 func TestClickhouse_GetNextServer(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, "", false, 0, 0)
 	c.AddServer("", true)
 	c.AddServer("http://127.0.0.1:8124", true)
 	c.AddServer("http://127.0.0.1:8125", true)
@@ -30,7 +30,7 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 }
 
 func TestClickhouse_Send(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, "", false, 0, 0)
 	c.AddServer("", true)
 	c.Send(&ClickhouseRequest{})
 	for !c.Queue.Empty() {
@@ -39,7 +39,7 @@ func TestClickhouse_Send(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, "", false, 0, 0)
 	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].Bad = true
@@ -49,7 +49,7 @@ func TestClickhouse_SendQuery(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery1(t *testing.T) {
-	c := NewClickhouse(-1, 10, "", false)
+	c := NewClickhouse(-1, 10, "", false, 0, 0)
 	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].Bad = true
@@ -61,7 +61,7 @@ func TestClickhouse_ResponseBodyClosed(t *testing.T) {
 	var closed bool
 	body := &spyBody{onClose: func() { closed = true }}
 	
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, "", false, 0, 0)
 	c.AddServer("http://example.com", false)
 	srv := c.GetNextServer()
 	srv.Client = &http.Client{

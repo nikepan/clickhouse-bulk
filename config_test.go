@@ -73,6 +73,72 @@ func TestConfigFileStructure(t *testing.T) {
 	assert.Greater(t, len(cnf.Clickhouse.Servers), 0)
 }
 
+func TestBackupConfig(t *testing.T) {
+	configContent := `{
+		"dump_dir": "dumps",
+		"bkp_dump_dir": "dumps-bkp",
+		"clickhouse": {
+			"servers": ["http://127.0.0.1:8123"]
+		},
+		"clickhouse-backup": {
+			"servers": ["http://127.0.0.2:8123"]
+		}
+	}`
+	tmpFile, err := os.CreateTemp("", "test_backup_config_*.json")
+	assert.Nil(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(configContent)
+	assert.Nil(t, err)
+	tmpFile.Close()
+
+	cnf, err := ReadConfig(tmpFile.Name())
+	assert.Nil(t, err)
+	assert.True(t, cnf.BackupEnabled())
+	assert.Equal(t, "dumps-bkp", cnf.BkpDumpDir)
+	assert.Equal(t, []string{"http://127.0.0.2:8123"}, cnf.ClickhouseBackup.Servers)
+
+	cnfNoBackup, err := ReadConfig("non_existent_config.json")
+	assert.Nil(t, err)
+	assert.False(t, cnfNoBackup.BackupEnabled())
+}
+
+func TestSplitTrimServers(t *testing.T) {
+	assert.Equal(t, []string{"http://a", "http://b"}, splitTrimServers("http://a, http://b , "))
+}
+
+func TestMergeQueryParams(t *testing.T) {
+	assert.Equal(t, "database=standby", mergeQueryParams("", "database=standby"))
+	assert.Equal(t, "a=1&database=standby", mergeQueryParams("a=1", "database=standby"))
+}
+
+func TestBackupEnvOverrides(t *testing.T) {
+	os.Setenv("CLICKHOUSE_BACKUP_SERVERS", "http://10.0.0.2:8123,http://10.0.0.3:8123")
+	os.Setenv("CLICKHOUSE_BKP_DUMP_DIR", "/var/bkp-dumps")
+	os.Setenv("CLICKHOUSE_BACKUP_DOWN_TIMEOUT", "120")
+	os.Setenv("CLICKHOUSE_BACKUP_CONNECT_TIMEOUT", "5")
+	os.Setenv("CLICKHOUSE_BACKUP_TLS_SERVER_NAME", "bkp.example.com")
+	os.Setenv("CLICKHOUSE_BACKUP_INSECURE_TLS_SKIP_VERIFY", "true")
+	defer func() {
+		os.Unsetenv("CLICKHOUSE_BACKUP_SERVERS")
+		os.Unsetenv("CLICKHOUSE_BKP_DUMP_DIR")
+		os.Unsetenv("CLICKHOUSE_BACKUP_DOWN_TIMEOUT")
+		os.Unsetenv("CLICKHOUSE_BACKUP_CONNECT_TIMEOUT")
+		os.Unsetenv("CLICKHOUSE_BACKUP_TLS_SERVER_NAME")
+		os.Unsetenv("CLICKHOUSE_BACKUP_INSECURE_TLS_SKIP_VERIFY")
+	}()
+
+	cnf, err := ReadConfig("non_existent_config.json")
+	assert.Nil(t, err)
+	assert.True(t, cnf.BackupEnabled())
+	assert.Equal(t, "/var/bkp-dumps", cnf.BkpDumpDir)
+	assert.Equal(t, []string{"http://10.0.0.2:8123", "http://10.0.0.3:8123"}, cnf.ClickhouseBackup.Servers)
+	assert.Equal(t, 120, cnf.ClickhouseBackup.DownTimeout)
+	assert.Equal(t, 5, cnf.ClickhouseBackup.ConnectTimeout)
+	assert.Equal(t, "bkp.example.com", cnf.ClickhouseBackup.TLSServerName)
+	assert.True(t, cnf.ClickhouseBackup.TLSSkipVerify)
+}
+
 func TestTLSConfig(t *testing.T) {
 	// Create a temporary config file with TLS settings
 	configContent := `{

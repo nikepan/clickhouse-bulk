@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +18,11 @@ import (
 
 const defaultDumpCheckInterval = 30
 const dumpResponseMark = "\n### RESPONSE ###\n"
+const dumpKindTransient = "1"
+const dumpKindClientError = "2"
+const failedDumpSubdir = "failed"
+
+var clientErrorDumpPattern = regexp.MustCompile(`^dump\d{14}` + dumpKindClientError + `-\d+-\d+\.dmp$`)
 
 // ErrNoDumps - signal that dumps not found
 var ErrNoDumps = errors.New("No dumps")
@@ -27,11 +34,13 @@ type Dumper interface {
 
 // FileDumper - dumps data to file system
 type FileDumper struct {
-	Path        string
-	DumpPrefix  string
-	DumpNum     int
-	LockedFiles map[string]bool
-	mu          sync.Mutex
+	Path         string
+	DumpPrefix   string
+	DumpNum      int
+	MaxDumpFiles int
+	MetricTarget string
+	LockedFiles  map[string]bool
+	mu           sync.Mutex
 }
 
 func (d *FileDumper) makePath(id string) string {
@@ -79,8 +88,70 @@ func (d *FileDumper) Dump(params string, content string, response string, prefix
 		log.Printf("ERROR: dump to file: %+v\n", err)
 	} else {
 		log.Printf("SUCCESS: dump to file: %+v\n", file_path)
+		d.pruneOldestIfNeeded()
+		d.updateDirMetrics()
 	}
 	return err
+}
+
+func (d *FileDumper) listPendingDumpFiles() ([]string, error) {
+	err := d.checkDir(false)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(d.Path)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0)
+	for _, f := range entries {
+		if !f.IsDir() && filepath.Ext(f.Name()) == ".dmp" {
+			out = append(out, f.Name())
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func (d *FileDumper) pruneOldestIfNeeded() {
+	if d.MaxDumpFiles <= 0 {
+		return
+	}
+	files, err := d.listPendingDumpFiles()
+	if err != nil {
+		return
+	}
+	for len(files) > d.MaxDumpFiles {
+		oldest := files[0]
+		if err := os.Remove(d.makePath(oldest)); err != nil {
+			log.Printf("ERROR: prune dump %+v: %+v\n", oldest, err)
+			break
+		}
+		log.Printf("WARN: pruned oldest dump (max_dump_files=%+v): %+v\n", d.MaxDumpFiles, oldest)
+		files = files[1:]
+	}
+}
+
+func (d *FileDumper) updateDirMetrics() {
+	var total int64
+	_ = filepath.Walk(d.Path, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		total += info.Size()
+		return nil
+	})
+	setDumpDirBytesGauge(d.MetricTarget, total)
+}
+
+func (d *FileDumper) effectiveReplayBatch(configured int) int {
+	if configured > 0 {
+		return configured
+	}
+	return 0
 }
 
 // GetDump - get dump file from filesystem
@@ -93,19 +164,13 @@ func (d *FileDumper) GetDump() (string, error) {
 		return "", err
 	}
 
-	files, err := os.ReadDir(d.Path)
+	dumpFiles, err := d.listPendingDumpFiles()
 	if err != nil {
 		return "", err
 	}
-	dumpFiles := make([]string, 0)
-	for _, f := range files {
-		if filepath.Ext(f.Name()) == ".dmp" {
-			dumpFiles = append(dumpFiles, f.Name())
-		}
-	}
-	sort.Strings(dumpFiles)
 
-	queuedDumps.Set(float64(len(dumpFiles)))
+	setQueuedDumpsGauge(d.MetricTarget, len(dumpFiles))
+	d.updateDirMetrics()
 
 	for _, f := range dumpFiles {
 		found, _ := d.LockedFiles[f]
@@ -127,11 +192,156 @@ func (d *FileDumper) GetDumpData(id string) (data string, response string, err e
 	return items[0], "", err
 }
 
+func isClientErrorDumpFile(name string) bool {
+	return clientErrorDumpPattern.MatchString(name)
+}
+
+func (d *FileDumper) failedDir() string {
+	return path.Join(d.Path, failedDumpSubdir)
+}
+
+func (d *FileDumper) moveToFailed(name string) error {
+	if err := os.MkdirAll(d.failedDir(), 0766); err != nil {
+		return err
+	}
+	src := d.makePath(name)
+	dst := path.Join(d.failedDir(), name)
+	if err := os.Rename(src, dst); err != nil {
+		return err
+	}
+	log.Printf("INFO: dump moved to failed (no retry): %s -> %s\n", src, dst)
+	return nil
+}
+
 // DeleteDump - get dump data from filesystem
 func (d *FileDumper) DeleteDump(id string) error {
 	path := d.makePath(id)
-	err := os.Remove(path)
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		err = os.Remove(path)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	return err
+}
+
+func parseDumpPayload(data string) (params, query, content string, rowCount int) {
+	lines := strings.Split(data, "\n")
+	if len(lines) == 0 {
+		return "", "", "", 0
+	}
+	if HasPrefix(lines[0], "insert") {
+		return "", lines[0], strings.Join(lines[1:], "\n"), len(lines) - 1
+	}
+	params = lines[0]
+	if len(lines) > 1 {
+		query = lines[1]
+	}
+	content = strings.Join(lines[1:], "\n")
+	if len(lines) > 2 {
+		rowCount = len(lines[2:])
+	}
+	return params, query, content, rowCount
+}
+
+func (d *FileDumper) sendDumpPayload(sender Sender, data string) (status int, err error) {
+	params, query, content, rowCount := parseDumpPayload(data)
+	if content == "" && query == "" && params == "" {
+		return http.StatusOK, nil
+	}
+	_, st, sendErr := sender.SendQuery(&ClickhouseRequest{
+		Params: params, Query: query, Content: content, Count: rowCount, isInsert: true,
+	})
+	return st, sendErr
+}
+
+func (d *FileDumper) listFailedDumpFiles() ([]string, error) {
+	dir := d.failedDir()
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".dmp" {
+			out = append(out, e.Name())
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// FailedReplayItem is one file result from ReplayFailed.
+type FailedReplayItem struct {
+	File   string `json:"file"`
+	Status int    `json:"status,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// FailedReplayReport summarizes replay from failed/.
+type FailedReplayReport struct {
+	Sent      int                `json:"sent"`
+	Errors    int                `json:"errors"`
+	Remaining int                `json:"remaining"`
+	Items     []FailedReplayItem `json:"items,omitempty"`
+}
+
+// ReplayFailed sends dumps from failed/ via sender (manual / HTTP trigger).
+// limit is max files to attempt; 0 = all. Successful sends delete the file.
+func (d *FileDumper) ReplayFailed(sender Sender, limit int) FailedReplayReport {
+	report := FailedReplayReport{}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	files, err := d.listFailedDumpFiles()
+	if err != nil {
+		report.Items = []FailedReplayItem{{File: "", Error: err.Error()}}
+		report.Errors++
+		return report
+	}
+	processed := 0
+	for _, name := range files {
+		if limit > 0 && processed >= limit {
+			break
+		}
+		processed++
+		item := FailedReplayItem{File: name}
+		rel := path.Join(failedDumpSubdir, name)
+		data, _, err := d.GetDumpData(rel)
+		if err != nil {
+			item.Error = err.Error()
+			report.Errors++
+			report.Items = append(report.Items, item)
+			continue
+		}
+		status, err := d.sendDumpPayload(sender, data)
+		if err != nil {
+			item.Status = status
+			item.Error = err.Error()
+			report.Errors++
+			report.Items = append(report.Items, item)
+			log.Printf("ERROR: replay failed dump %s: (%+v) %+v\n", name, status, err)
+			continue
+		}
+		if err := os.Remove(d.makePath(rel)); err != nil {
+			item.Error = "sent but delete failed: " + err.Error()
+			report.Errors++
+			report.Items = append(report.Items, item)
+			continue
+		}
+		report.Sent++
+		report.Items = append(report.Items, item)
+		log.Printf("INFO: replay failed dump sent: %s\n", name)
+	}
+	remaining, _ := d.listFailedDumpFiles()
+	report.Remaining = len(remaining)
+	d.updateDirMetrics()
+	return report
 }
 
 // ProcessNextDump - try to send next dump to server
@@ -148,20 +358,18 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	if f == "" {
 		return nil
 	}
+	if isClientErrorDumpFile(f) {
+		if err := d.moveToFailed(f); err != nil {
+			return fmt.Errorf("move client-error dump to failed: %+v", err)
+		}
+		return nil
+	}
 	data, _, err := d.GetDumpData(f)
 	if err != nil {
 		return fmt.Errorf("Dump read error: %+v", err)
 	}
 	if data != "" {
-		params := ""
-		query := ""
-		lines := strings.Split(data, "\n")
-		if !HasPrefix(lines[0], "insert") {
-			params = lines[0]
-			query = lines[1]
-			data = strings.Join(lines[1:], "\n")
-		}
-		_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data, Query: query, Count: len(lines[2:]), isInsert: true})
+		status, err := d.sendDumpPayload(sender, data)
 		if err != nil {
 			return fmt.Errorf("server error (%+v) %+v", status, err)
 		}
@@ -175,16 +383,22 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 	return err
 }
 
-// Listen - reads dumps from disk and try to send it
-func (d *FileDumper) Listen(sender Sender, interval int) {
+// Listen reads dumps from disk and tries to send them on a schedule.
+// replayBatch limits files processed per tick (0 = unlimited).
+func (d *FileDumper) Listen(sender Sender, interval int, replayBatch int) {
 	d.LockedFiles = make(map[string]bool)
 	if interval == 0 {
 		interval = defaultDumpCheckInterval
 	}
+	batchLimit := d.effectiveReplayBatch(replayBatch)
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	go func() {
 		for range ticker.C {
+			processed := 0
 			for {
+				if batchLimit > 0 && processed >= batchLimit {
+					break
+				}
 				err := d.ProcessNextDump(sender)
 				if err != nil {
 					if !errors.Is(err, ErrNoDumps) {
@@ -192,7 +406,9 @@ func (d *FileDumper) Listen(sender Sender, interval int) {
 					}
 					break
 				}
+				processed++
 			}
+			d.updateDirMetrics()
 		}
 	}()
 }

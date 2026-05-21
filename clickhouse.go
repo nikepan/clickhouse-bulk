@@ -31,6 +31,10 @@ type Clickhouse struct {
 	DownTimeout    int
 	ConnectTimeout int
 	Dumper         Dumper
+	QueryParams    string // appended to every request (&-separated)
+	MetricTarget   string // "" or "live" for primary; "backup" for clickhouse-backup
+	Journal        *Journal
+	sendLimiter    *sendRateLimiter
 	wg             sync.WaitGroup
 	Transport      *http.Transport
 }
@@ -40,8 +44,9 @@ type ClickhouseRequest struct {
 	Params   string
 	Query    string
 	Content  string
-	Count    int
-	isInsert bool
+	Count      int
+	JournalIDs []uint64
+	isInsert   bool
 }
 
 // ErrServerIsDown - signals about server is down
@@ -51,7 +56,7 @@ var ErrServerIsDown = errors.New("server is down")
 var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
-func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
+func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool, sendMaxRPS, sendMaxBurst int) (c *Clickhouse) {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -70,6 +75,7 @@ func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tl
 	}
 	c.Servers = make([]*ClickhouseServer, 0)
 	c.Queue = queue.New(1000)
+	c.sendLimiter = newSendRateLimiter(sendMaxRPS, sendMaxBurst)
 	c.Transport = &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
@@ -99,8 +105,8 @@ func (c *Clickhouse) DumpServers() {
 			good++
 		}
 	}
-	goodServers.Set(float64(good))
-	badServers.Set(float64(bad))
+	setServerGauges(c.MetricTarget, good, bad)
+	setSendQueueGauge(c.MetricTarget, c.Queue.Len())
 }
 
 // GetNextServer - getting next server for request
@@ -137,9 +143,21 @@ func (c *Clickhouse) Send(r *ClickhouseRequest) {
 	c.Queue.Put(r)
 }
 
+// ackJournal clears WAL entries once data is durably stored (ClickHouse or dump_dir).
+func (c *Clickhouse) ackJournal(ids []uint64) {
+	if c.Journal == nil || len(ids) == 0 {
+		return
+	}
+	if err := c.Journal.Ack(ids); err != nil {
+		log.Printf("ERROR: journal ack: %+v\n", err)
+		return
+	}
+	setJournalPendingGauge(c.Journal)
+}
+
 // Dump - save query to file
 func (c *Clickhouse) Dump(params string, content string, response string, prefix string, status int) error {
-	dumpCounter.Inc()
+	incDumpCounter(c.MetricTarget)
 	if c.Dumper != nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -173,9 +191,15 @@ func (c *Clickhouse) Run() {
 				if status >= 400 && status < 502 {
 					prefix = "2"
 				}
-				c.Dump(data.Params, data.Content, resp, prefix, status)
+				if dumpErr := c.Dump(data.Params, data.Content, resp, prefix, status); dumpErr != nil {
+					log.Printf("ERROR: dump failed, journal entries retained: %+v\n", dumpErr)
+				} else {
+					c.ackJournal(data.JournalIDs)
+				}
 			} else {
-				sentCounter.Inc()
+				incSentCounter(c.MetricTarget)
+				recordLastSent(c.MetricTarget)
+				c.ackJournal(data.JournalIDs)
 			}
 			c.DumpServers()
 			c.wg.Done()
@@ -222,12 +246,30 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 	return "", http.StatusOK, err
 }
 
+// ServersSnapshot returns URL and Bad flag for each configured server.
+func (c *Clickhouse) ServersSnapshot() []ServerStatus {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]ServerStatus, 0, len(c.Servers))
+	for _, s := range c.Servers {
+		out = append(out, ServerStatus{URL: s.URL, Bad: s.Bad})
+	}
+	return out
+}
+
 // SendQuery - sends query to server and return result (with server cycle)
 func (c *Clickhouse) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
+	if c.sendLimiter != nil {
+		c.sendLimiter.Wait()
+	}
+	req := *r
+	if c.QueryParams != "" {
+		req.Params = mergeQueryParams(r.Params, c.QueryParams)
+	}
 	for {
 		s := c.GetNextServer()
 		if s != nil {
-			response, status, err = s.SendQuery(r)
+			response, status, err = s.SendQuery(&req)
 			if errors.Is(err, ErrServerIsDown) {
 				log.Printf("ERROR: server down (%+v): %+v\n", status, response)
 				continue
