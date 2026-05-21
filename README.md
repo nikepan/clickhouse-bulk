@@ -167,7 +167,7 @@ Docker images are published as `itcrow/clickhouse-bulk` — Hub user must match 
 
 ### CI build (optional Codacy)
 
-Tests always run on push/PR. Codacy upload runs only if secret **`CODACY_PROJECT_TOKEN`** is set.
+Tests always run on push/PR. Codacy upload runs only if secret **`CODACY_PROJECT_TOKEN`** is set (skipped in shell when empty).
 
 If upload fails with `Request URL not found`:
 
