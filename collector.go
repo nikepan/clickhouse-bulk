@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"net/url"
 	"regexp"
 	"strings"
@@ -41,6 +42,7 @@ type Collector struct {
 	FlushInterval int
 	CleanInterval int
 	RemoveQueryID bool
+	OpaqueInsert  bool // force opaque passthrough for all INSERTs
 	Sender        Sender
 	Journal       *Journal
 	TickerChan    *chan struct{}
@@ -57,7 +59,7 @@ func NewTable(name string, sender Sender, count int, interval int) (t *Table) {
 }
 
 // NewCollector - default collector constructor
-func NewCollector(sender Sender, journal *Journal, count int, interval int, cleanInterval int, removeQueryID bool) (c *Collector) {
+func NewCollector(sender Sender, journal *Journal, count int, interval int, cleanInterval int, removeQueryID bool, opaqueInsert bool) (c *Collector) {
 	c = new(Collector)
 	c.Sender = sender
 	c.Journal = journal
@@ -66,6 +68,7 @@ func NewCollector(sender Sender, journal *Journal, count int, interval int, clea
 	c.FlushInterval = interval
 	c.CleanInterval = cleanInterval
 	c.RemoveQueryID = removeQueryID
+	c.OpaqueInsert = opaqueInsert
 	if cleanInterval > 0 {
 		c.TickerChan = c.RunTimer()
 	}
@@ -327,6 +330,44 @@ func (c *Collector) Push(paramsIn string, content string, journalID uint64) {
 	table.Add(content, journalID)
 	c.mu.Unlock()
 	pushCounter.Inc()
+}
+
+// PushOpaque enqueues one INSERT verbatim (no batch merge). Used for Native / octet-stream drivers.
+func (c *Collector) PushOpaque(params, content, contentType string, journalID uint64) {
+	q := insertQueryString(params, []byte(content))
+	req := &ClickhouseRequest{
+		Params:      params,
+		Query:       q,
+		Content:     content,
+		ContentType: contentType,
+		Count:       1,
+		isInsert:    true,
+		opaque:      true,
+	}
+	if journalID > 0 {
+		req.JournalIDs = []uint64{journalID}
+	}
+	c.Sender.Send(req)
+	pushCounter.Inc()
+}
+
+// ReplayJournalRecord replays one WAL row after startup (batched or opaque).
+func (c *Collector) ReplayJournalRecord(rec journalRecord) {
+	content := rec.Content
+	if rec.Opaque && rec.ContentB64 != "" {
+		if b, err := base64.StdEncoding.DecodeString(rec.ContentB64); err == nil {
+			content = string(b)
+		}
+	}
+	if rec.Opaque {
+		ct := rec.ContentType
+		if ct == "" {
+			ct = outboundContentType("", insertQueryString(rec.Params, []byte(content)))
+		}
+		c.PushOpaque(rec.Params, content, ct, rec.ID)
+		return
+	}
+	c.Push(rec.Params, content, rec.ID)
 }
 
 // ParseQuery - parsing inbound query to unified format (params/query), content (query data)

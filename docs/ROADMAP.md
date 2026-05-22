@@ -142,7 +142,7 @@ See [DUAL_WRITE.md](./DUAL_WRITE.md), [RISKS.md](./RISKS.md), [CONFIG.md](./CONF
 | `query_params` for backup | ✅ |
 | `config.sample-backup.json` | ✅ |
 | Journal (P0.01) | ✅ |
-| Roadmap items (open above) | P1.06, P4 (client compatibility) |
+| Roadmap items (open above) | P1.06, P4.2–P4.5 |
 
 ---
 
@@ -152,15 +152,10 @@ Goal: improve interoperability with [clickhouse-go](https://github.com/ClickHous
 
 Design principle: **default path unchanged** (batched text INSERT for Vector/curl); new behaviour behind config flags.
 
-### P4.1 — Opaque INSERT passthrough — open
+### P4.1 — Opaque INSERT passthrough — **done**
 
-- **Problem:** Drivers send `INSERT … FORMAT Native` + `application/octet-stream` (or full query+body blob). Bulk’s `ParseQuery` / `Collector` only merge **text** `FORMAT` / `VALUES` rows.
-- **Proposal:**
-  - Detect passthrough: e.g. `Content-Type: application/octet-stream`, or `FORMAT Native` / `RowBinary` in query, or config `opaque_insert: true` for all INSERTs.
-  - Skip collector batching: after optional journal `Append`, enqueue one `ClickhouseRequest` with **raw** URL params + body (or forward client body verbatim).
-  - Still async `200` + empty body (unless P4.5).
-- **Effort:** ~2–4 days.
-- **Unlocks:** clickhouse-go HTTP `PrepareBatch`; connect `insert()` body format (still no sync errors).
+- **Status:** ✅ Auto-detect (`application/octet-stream`, `FORMAT Native` / `RowBinary` / `Parquet` / `Arrow` / … in `query=`) or `opaque_insert: true` for every INSERT. Skips collector batching; optional journal (`AppendOpaque`, base64 body); outbound POST preserves client `Content-Type` (default `application/octet-stream` for binary formats). Async `200` unchanged.
+- **Unlocks:** clickhouse-go HTTP `PrepareBatch`; connect `insert()` payload pass-through (errors still async until P4.5).
 
 ### P4.2 — Request decompression — open
 
@@ -200,7 +195,7 @@ Design principle: **default path unchanged** (batched text INSERT for Vector/cur
 ### Recommended implementation order
 
 1. P4.6 (docs) ✅  
-2. P4.1 opaque passthrough  
+2. ~~P4.1 opaque passthrough~~ ✅  
 3. P4.2 decompression  
 4. P4.4 hybrid formats  
 5. P4.3 headers (proxied, then passthrough if sync)  

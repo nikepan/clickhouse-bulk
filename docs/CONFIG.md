@@ -17,6 +17,7 @@ Config file: JSON (default `config.json`). Override via environment variables (D
 | `flush_interval` | `CLICKHOUSE_FLUSH_INTERVAL` | `1000` | Flush interval (ms) |
 | `clean_interval` | `CLICKHOUSE_CLEAN_INTERVAL` | `0` | Remove idle internal tables (ms); `0` = off |
 | `remove_query_id` | `CLICKHOUSE_REMOVE_QUERY_ID` | `true` | Strip `query_id` for batching |
+| `opaque_insert` | `OPAQUE_INSERT` | `false` | If `true`, every INSERT bypasses batching (opaque passthrough). Default: auto for `FORMAT Native` / `RowBinary` / … and `Content-Type: application/octet-stream` |
 | `dump_check_interval` | `DUMP_CHECK_INTERVAL` | `300` | Live dump replay period (s); `-1` = off |
 | `bkp_dump_check_interval` | `BKP_DUMP_CHECK_INTERVAL` | `0` | Backup dump replay (s); `0` = use `dump_check_interval` |
 | `dump_replay_batch` | `DUMP_REPLAY_BATCH` | `0` | Max dump files replayed per tick per target; `0` = unlimited |

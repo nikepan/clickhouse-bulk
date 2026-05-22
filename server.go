@@ -60,14 +60,7 @@ func NewServer(listen string, collector *Collector, live *Clickhouse, backup *Cl
 }
 
 func (server *Server) writeHandler(c echo.Context) error {
-	q, _ := io.ReadAll(c.Request().Body)
-	s := string(q)
-
-	if server.Debug {
-		log.Printf("DEBUG: %s body_bytes=%d snippet=%q\n",
-			logInsertMeta(c.QueryString(), s), len(s), logTruncate(s, 64))
-	}
-
+	body, _ := io.ReadAll(c.Request().Body)
 	qs := c.QueryString()
 	user, password, ok := c.Request().BasicAuth()
 	if ok {
@@ -77,6 +70,18 @@ func (server *Server) writeHandler(c echo.Context) error {
 			qs = "user=" + user + "&password=" + password + "&" + qs
 		}
 	}
+	clientCT := c.Request().Header.Get("Content-Type")
+
+	if server.Debug {
+		log.Printf("DEBUG: %s body_bytes=%d snippet=%q\n",
+			logInsertMeta(qs, string(body)), len(body), logTruncate(string(body), 64))
+	}
+
+	if shouldOpaqueInsert(server.Collector.OpaqueInsert, clientCT, qs, body) {
+		return server.acceptOpaqueInsert(c, qs, string(body), clientCT)
+	}
+
+	s := string(body)
 	params, content, insert := server.Collector.ParseQuery(qs, s)
 	if insert {
 		if len(content) == 0 {
@@ -101,6 +106,29 @@ func (server *Server) writeHandler(c echo.Context) error {
 	}
 	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, isInsert: false})
 	return c.String(status, resp)
+}
+
+func (server *Server) acceptOpaqueInsert(c echo.Context, params, content, clientCT string) error {
+	if len(content) == 0 && queryFromParams(params) == "" {
+		log.Printf("INFO: empty opaque insert %s\n", logInsertMeta(params, content))
+		return c.String(http.StatusInternalServerError, "Empty insert\n")
+	}
+	outCT := outboundContentType(clientCT, insertQueryString(params, []byte(content)))
+	var journalID uint64
+	if server.Collector.Journal != nil {
+		id, err := server.Collector.Journal.AppendOpaque(params, content, outCT)
+		if err != nil {
+			log.Printf("ERROR: journal append opaque: %+v\n", err)
+			if errors.Is(err, ErrJournalBacklog) {
+				return c.String(http.StatusServiceUnavailable, "Journal backlog full\n")
+			}
+			return c.String(http.StatusInternalServerError, "Journal write failed\n")
+		}
+		journalID = id
+		setJournalPendingGauge(server.Collector.Journal)
+	}
+	go server.Collector.PushOpaque(params, content, outCT, journalID)
+	return c.String(http.StatusOK, "")
 }
 
 func (server *Server) statusHandler(c echo.Context) error {
@@ -298,11 +326,11 @@ func RunServer(cnf Config) {
 		startDumpReplay(liveDumper, liveSender, cnf.DumpCheckInterval, cnf.DumpReplayBatch)
 	}
 
-	collect := NewCollector(sender, journal, cnf.FlushCount, cnf.FlushInterval, cnf.CleanInterval, cnf.RemoveQueryID)
+	collect := NewCollector(sender, journal, cnf.FlushCount, cnf.FlushInterval, cnf.CleanInterval, cnf.RemoveQueryID, cnf.OpaqueInsert)
 
 	if journal != nil {
 		RegisterJournalMetrics()
-		if err := journal.ReplayUnacked(collect.Push); err != nil {
+		if err := journal.ReplayUnacked(collect.ReplayJournalRecord); err != nil {
 			log.Fatalf("ERROR: journal replay: %+v\n", err)
 		}
 		if err := journal.Compact(); err != nil {
@@ -333,6 +361,11 @@ func RunServer(cnf Config) {
 		os.Exit(exitCode)
 	}()
 
+	if cnf.OpaqueInsert {
+		log.Printf("Opaque INSERT passthrough: all INSERTs bypass batching (opaque_insert=true)\n")
+	} else {
+		log.Printf("Opaque INSERT passthrough: auto for FORMAT Native/RowBinary/… and application/octet-stream\n")
+	}
 	log.Printf("Server starting on %s\n", cnf.Listen)
 	err = srv.Start(cnf)
 	if err != nil && err != http.ErrServerClosed {

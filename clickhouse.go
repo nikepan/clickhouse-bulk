@@ -41,12 +41,14 @@ type Clickhouse struct {
 
 // ClickhouseRequest - request struct for queue
 type ClickhouseRequest struct {
-	Params   string
-	Query    string
-	Content  string
-	Count      int
-	JournalIDs []uint64
-	isInsert   bool
+	Params      string
+	Query       string
+	Content     string
+	ContentType string // outbound POST type; empty = text/plain
+	Count       int
+	JournalIDs  []uint64
+	isInsert    bool
+	opaque      bool // true: body is verbatim client payload (no batch merge)
 }
 
 // ErrServerIsDown - signals about server is down
@@ -223,7 +225,11 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		if r.isInsert && srv.LogQueries {
 			log.Printf("INFO: sending %+v rows to %+v query=%q\n", r.Count, srv.URL, logTruncate(r.Query, 200))
 		}
-		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
+		ct := r.ContentType
+		if ct == "" {
+			ct = "text/plain"
+		}
+		resp, err := srv.Client.Post(url, ct, strings.NewReader(r.Content))
 		if err != nil {
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown

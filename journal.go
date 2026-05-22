@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -28,9 +29,12 @@ type Journal struct {
 }
 
 type journalRecord struct {
-	ID      uint64 `json:"id"`
-	Params  string `json:"params"`
-	Content string `json:"content"`
+	ID          uint64 `json:"id"`
+	Params      string `json:"params"`
+	Content     string `json:"content,omitempty"`
+	ContentB64  string `json:"content_b64,omitempty"`
+	Opaque      bool   `json:"opaque,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
 }
 
 // NewJournal opens or creates a journal directory.
@@ -114,8 +118,23 @@ func (j *Journal) DirBytes() (int64, error) {
 	return total, err
 }
 
-// Append persists one insert before returning success to the client.
+// Append persists one batched-text insert before returning success to the client.
 func (j *Journal) Append(params, content string) (uint64, error) {
+	return j.appendRecord(journalRecord{Params: params, Content: content})
+}
+
+// AppendOpaque persists one opaque (binary) insert before HTTP 200.
+func (j *Journal) AppendOpaque(params, content, contentType string) (uint64, error) {
+	rec := journalRecord{
+		Params:      params,
+		Opaque:      true,
+		ContentType: contentType,
+		ContentB64:  base64.StdEncoding.EncodeToString([]byte(content)),
+	}
+	return j.appendRecord(rec)
+}
+
+func (j *Journal) appendRecord(rec journalRecord) (uint64, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if j.maxPending > 0 {
@@ -129,7 +148,7 @@ func (j *Journal) Append(params, content string) (uint64, error) {
 	}
 	j.nextID++
 	id := j.nextID
-	rec := journalRecord{ID: id, Params: params, Content: content}
+	rec.ID = id
 	line, err := json.Marshal(rec)
 	if err != nil {
 		return 0, err
@@ -208,7 +227,7 @@ func (j *Journal) PendingCount() (int, error) {
 }
 
 // ReplayUnacked pushes all non-acked records into the collector.
-func (j *Journal) ReplayUnacked(push func(params, content string, journalID uint64)) error {
+func (j *Journal) ReplayUnacked(replay func(journalRecord)) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	f, err := os.Open(j.walPath())
@@ -231,7 +250,7 @@ func (j *Journal) ReplayUnacked(push func(params, content string, journalID uint
 		if _, ok := j.acked[rec.ID]; ok {
 			continue
 		}
-		push(rec.Params, rec.Content, rec.ID)
+		replay(rec)
 		count++
 	}
 	if count > 0 {

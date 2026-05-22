@@ -19,7 +19,7 @@ import (
 
 func TestRunServer(t *testing.T) {
 	cnf, _ := ReadConfig("wrong_config.json")
-	collector := NewCollector(&fakeSender{}, nil, 1000, 1000, 0, true)
+	collector := NewCollector(&fakeSender{}, nil, 1000, 1000, 0, true, false)
 	server := InitServer("", collector, nil, nil, nil, nil, false, false, true)
 	go server.Start(cnf)
 	server.echo.POST("/", server.writeHandler)
@@ -71,7 +71,7 @@ func TestRunServer(t *testing.T) {
 
 func TestServer_SafeQuit(t *testing.T) {
 	sender := &fakeSender{}
-	collect := NewCollector(sender, nil, 1000, 1000, 0, true)
+	collect := NewCollector(sender, nil, 1000, 1000, 0, true, false)
 	collect.AddTable("test")
 	collect.Push("sss", "sss", 0)
 
@@ -109,7 +109,7 @@ func TestServer_MultiServer(t *testing.T) {
 	sender := NewClickhouse(10, 10, "", false, 0, 0)
 	sender.AddServer(s1.URL, true)
 	sender.AddServer(s2.URL, true)
-	collect := NewCollector(sender, nil, 1000, 1000, 0, true)
+	collect := NewCollector(sender, nil, 1000, 1000, 0, true, false)
 	collect.AddTable("test")
 	collect.Push("eee", "eee", 0)
 	collect.Push("fff", "fff", 0)

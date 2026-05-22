@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **P4.1 Opaque INSERT passthrough:** auto for `FORMAT Native` / `RowBinary` / `Parquet` / `Arrow` / … and `Content-Type: application/octet-stream`; config `opaque_insert` / `OPAQUE_INSERT` forces all INSERTs through passthrough. No batch merge; journal stores binary body as base64; outbound POST preserves `Content-Type`.
 - [docs/DOCKER.md](docs/DOCKER.md) — Docker Hub link, run/how-to, `docker push itcrow/clickhouse-bulk:tagname`.
 - Docs: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) (clickhouse-go, clickhouse-connect); roadmap in [docs/ROADMAP.md](docs/ROADMAP.md).
 - Dependabot: `.github/dependabot.yml` (gomod, github-actions, docker; weekly).

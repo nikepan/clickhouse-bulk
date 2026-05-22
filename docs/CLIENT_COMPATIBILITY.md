@@ -10,15 +10,16 @@ This document describes **current** behaviour and **planned** improvements. See 
 
 | Path | Detection | Client response | To ClickHouse |
 |------|-----------|-----------------|---------------|
-| **Batched INSERT** | `INSERT` in `query=` or body | `200` + **empty body** (async) | POST `text/plain` after flush |
+| **Batched INSERT** | Text `INSERT` (`TabSeparated`, `VALUES`, …) | `200` + **empty body** (async) | POST `text/plain` after flush |
+| **Opaque INSERT** (P4.1) | `FORMAT Native` / `RowBinary` / …, or `application/octet-stream`, or `opaque_insert` | `200` + **empty body** (async) | POST with client `Content-Type`, body verbatim |
 | **Proxied query** | Not `INSERT` | CH **status + body** (sync) | POST `text/plain`, same request |
-| **Dual-write** | Batched INSERT only | Same async `200` | Live + backup queues |
+| **Dual-write** | Batched + opaque INSERT | Same async `200` | Live + backup queues |
 
 Important differences from direct `:8123`:
 
 - No forwarding of `X-ClickHouse-*` response headers to the client.
 - No request decompression (`Content-Encoding: lz4`, `gzip`, …).
-- Outbound POST to CH uses `Content-Type: text/plain` only.
+- Batched outbound POST uses `Content-Type: text/plain`. Opaque INSERT (P4.1) forwards `Content-Type` (e.g. `application/octet-stream`).
 - `remove_query_id: true` (default) strips `query_id` from the batching key.
 - With `journal_dir`, HTTP `200` means **WAL append**, not “row visible in CH”.
 
@@ -29,7 +30,7 @@ Important differences from direct `:8123`:
 | Client | Transport to bulk | Typical use with bulk | Works today? |
 |--------|-------------------|------------------------|--------------|
 | [clickhouse-go](https://github.com/ClickHouse/clickhouse-go) v2 | Native TCP `:9000` | Point driver at **ClickHouse**, not bulk | ✅ (bypass bulk) |
-| clickhouse-go v2 | HTTP `:8124` | Batch API / `PrepareBatch` | ❌ Not recommended |
+| clickhouse-go v2 | HTTP `:8124` | Batch API / `PrepareBatch` | ⚠️ Opaque passthrough (P4.1); no compression (P4.2); async `200` |
 | [clickhouse-connect](https://clickhouse.com/docs/integrations/python) | HTTP `:8124` | `query()` / `command()` | ✅ Good |
 | clickhouse-connect | HTTP `:8124` | `raw_insert` text formats, `compress=False` | ⚠️ Partial |
 | clickhouse-connect | HTTP `:8124` | `insert()` (Native default) | ❌ Poor |
@@ -53,7 +54,7 @@ Official driver: [ClickHouse/clickhouse-go](https://github.com/ClickHouse/clickh
 | API | Via bulk (`:8124`) | Notes |
 |-----|-------------------|--------|
 | `clickhouse.Open` / `OpenDB`, **Protocol: Native** (default) | N/A | Connect to ClickHouse directly — **best for Go apps** |
-| `Protocol: clickhouse.HTTP` + `PrepareBatch` / `AsyncInsert` | ❌ | Native binary + compression; bulk parses **text** INSERT only |
+| `Protocol: clickhouse.HTTP` + `PrepareBatch` / `AsyncInsert` | ⚠️ | P4.1 passes Native/octet-stream; **no** request decompression (P4.2); async accept |
 | `Protocol: clickhouse.HTTP` + `Query` / `Exec` (SELECT, DDL) | ✅ | Sync proxy on **live**; backup not used |
 | `database/sql` over HTTP DSN | ❌ for `INSERT`; ✅ for reads | Same as above |
 
@@ -102,7 +103,7 @@ Official driver: [clickhouse-connect](https://clickhouse.com/docs/integrations/p
 |-----|----------|--------|
 | `get_client(host=bulk, port=8124)` + `query()` / `command()` | ✅ | Same as direct HTTP for non-INSERT |
 | `raw_insert(..., fmt='TabSeparated', compression=None)` | ⚠️ | Text INSERT can be batched; **no CH error returned** to Python; no summary headers |
-| `insert()` / `insert_df()` / Arrow | ❌ | Native/binary; bulk cannot merge batches; async `200` hides CH errors |
+| `insert()` / `insert_df()` / Arrow | ⚠️ | P4.1 opaque passthrough; `compress=True` still unsupported (P4.2); async `200` hides CH errors |
 | `compress=True` (default possible) | ❌ | Bulk does not decompress request body |
 
 ### Example (partial compatibility)
@@ -153,7 +154,7 @@ client.raw_insert(
 | INSERT response | CH body (`Ok.`, errors) | Empty `200` (queued) |
 | Response headers | Full | Not forwarded (insert); proxied queries: body only |
 | Request compression | Supported | Not supported |
-| Native / octet-stream INSERT | Supported | Not parsed (text INSERT path only) |
+| Native / octet-stream INSERT | Supported | Opaque passthrough (P4.1); no batch merge |
 | Journal before accept | No | Optional (`journal_dir`) |
 | Dual-write to standby | No (use CH replication) | Optional (`clickhouse-backup`) |
 
@@ -165,7 +166,7 @@ See [ROADMAP.md — P4 Client compatibility](./ROADMAP.md#p4--client-compatibili
 
 | Phase | Feature | Unlocks |
 |-------|---------|---------|
-| **P4.1** | Opaque INSERT passthrough (Native / octet-stream, no batch merge) | clickhouse-go HTTP batch, connect `insert()` payload pass-through (still async) |
+| **P4.1** | Opaque INSERT passthrough ✅ | clickhouse-go HTTP batch, connect `insert()` payload pass-through (still async) |
 | **P4.2** | Request decompression; preserve `Content-Type` to CH | LZ4/gzip clients |
 | **P4.3** | Forward `X-ClickHouse-*` on proxied queries; optional on passthrough | Richer `QuerySummary` where CH returns headers |
 | **P4.4** | Config: `batch_formats` vs passthrough formats | Hybrid: batch TSV, passthrough Native |

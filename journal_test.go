@@ -25,9 +25,9 @@ func TestJournal_AppendAckReplay(t *testing.T) {
 	assert.Equal(t, 2, pending)
 
 	replayed := 0
-	err = j.ReplayUnacked(func(params, content string, journalID uint64) {
+	err = j.ReplayUnacked(func(rec journalRecord) {
 		replayed++
-		assert.NotZero(t, journalID)
+		assert.NotZero(t, rec.ID)
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, 2, replayed)
@@ -48,7 +48,7 @@ func TestJournal_AppendAckReplay(t *testing.T) {
 	assert.Nil(t, err)
 
 	replayed = 0
-	err = j.ReplayUnacked(func(params, content string, journalID uint64) {
+	err = j.ReplayUnacked(func(rec journalRecord) {
 		replayed++
 	})
 	assert.Nil(t, err)

@@ -32,6 +32,7 @@ type Config struct {
 	FlushInterval     int               `json:"flush_interval"`
 	CleanInterval     int               `json:"clean_interval"`
 	RemoveQueryID     bool              `json:"remove_query_id"`
+	OpaqueInsert      bool              `json:"opaque_insert"`
 	DumpCheckInterval    int `json:"dump_check_interval"`
 	BkpDumpCheckInterval int `json:"bkp_dump_check_interval"`
 	DumpReplayBatch      int `json:"dump_replay_batch"`
@@ -240,6 +241,7 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("CLICKHOUSE_FLUSH_INTERVAL", &cnf.FlushInterval)
 	readEnvInt("CLICKHOUSE_CLEAN_INTERVAL", &cnf.CleanInterval)
 	readEnvBool("CLICKHOUSE_REMOVE_QUERY_ID", &cnf.RemoveQueryID)
+	readEnvBool("OPAQUE_INSERT", &cnf.OpaqueInsert)
 	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
 	readEnvInt("BKP_DUMP_CHECK_INTERVAL", &cnf.BkpDumpCheckInterval)
 	readEnvInt("DUMP_REPLAY_BATCH", &cnf.DumpReplayBatch)
