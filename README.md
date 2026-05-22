@@ -36,6 +36,7 @@ Send INSERTs to `http://127.0.0.1:8124` (not the native ClickHouse port unless y
 |-----|----------|
 | [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md) | Architecture, journal, dumps, guarantees |
 | [docs/RISKS.md](docs/RISKS.md) | Operational risks by mode (live / journal / dual-write) |
+| [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) | clickhouse-go, clickhouse-connect, HTTP driver fit |
 | [docs/CONFIG.md](docs/CONFIG.md) | Full config and env reference |
 | [docs/ALERTS.md](docs/ALERTS.md) | Prometheus alert examples |
 | [CHANGELOG.md](CHANGELOG.md) | Change history |

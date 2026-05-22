@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Docs: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) (clickhouse-go, clickhouse-connect); P4 roadmap in [Plan.md](Plan.md).
 - Dependabot: `.github/dependabot.yml` (gomod, github-actions, docker; weekly).
 - **Live / backup dual-write** when `clickhouse-backup.servers` or `CLICKHOUSE_BACKUP_SERVERS` is set.
 - `DualSender`, separate queues, dumps (`dump_dir`, `bkp_dump_dir`), and replay loops.

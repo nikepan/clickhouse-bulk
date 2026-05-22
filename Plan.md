@@ -142,4 +142,72 @@ See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [d
 | `query_params` for backup | ✅ |
 | `config.sample-backup.json` | ✅ |
 | Journal (P0.01) | ✅ |
-| Plan items (open above) | P1.06 |
+| Plan items (open above) | P1.06, P4 (client compatibility) |
+
+---
+
+## P4 — Client compatibility (optional)
+
+Goal: improve interoperability with [clickhouse-go](https://github.com/ClickHouse/clickhouse-go) and [clickhouse-connect](https://clickhouse.com/docs/integrations/python) **without** turning bulk into a full HTTP proxy. Current behaviour: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md).
+
+Design principle: **default path unchanged** (batched text INSERT for Vector/curl); new behaviour behind config flags.
+
+### P4.1 — Opaque INSERT passthrough — open
+
+- **Problem:** Drivers send `INSERT … FORMAT Native` + `application/octet-stream` (or full query+body blob). Bulk’s `ParseQuery` / `Collector` only merge **text** `FORMAT` / `VALUES` rows.
+- **Proposal:**
+  - Detect passthrough: e.g. `Content-Type: application/octet-stream`, or `FORMAT Native` / `RowBinary` in query, or config `opaque_insert: true` for all INSERTs.
+  - Skip collector batching: after optional journal `Append`, enqueue one `ClickhouseRequest` with **raw** URL params + body (or forward client body verbatim).
+  - Still async `200` + empty body (unless P4.5).
+- **Effort:** ~2–4 days.
+- **Unlocks:** clickhouse-go HTTP `PrepareBatch`; connect `insert()` body format (still no sync errors).
+
+### P4.2 — Request decompression — open
+
+- **Problem:** clickhouse-go (LZ4/ZSTD) and clickhouse-connect (`compress=True`) send `Content-Encoding` / CH `decompress=1` settings. Bulk reads body as plain text.
+- **Proposal:** If `Content-Encoding` or `decompress` setting present, decompress in `writeHandler` before routing; config `max_request_bytes`.
+- **Effort:** ~2–3 days (add deps: klauspost/compress or std for gzip).
+- **Depends on:** P4.1 for Native payloads.
+
+### P4.3 — Response header forwarding — open
+
+- **Problem:** connect reads `X-ClickHouse-Summary`, `X-ClickHouse-Query-Id`; bulk returns only status + body on proxied queries; INSERT returns empty body.
+- **Proposal:**
+  - On **proxied** (`SendQuery`, non-insert): copy CH response headers to Echo response.
+  - On **passthrough INSERT** (P4.1): optional forward headers if we switch to sync wait (P4.5) or fire-and-forget with empty body (limited value).
+- **Effort:** ~1 day (proxied only); +1–2 days with passthrough sync.
+- **Code touch:** `ClickhouseServer.SendQuery` return headers; `writeHandler` set `c.Response().Header()`.
+
+### P4.4 — Hybrid batch formats (config) — open
+
+- **Problem:** Want TabSeparated batched for ETL, Native passthrough for apps.
+- **Proposal:** Config e.g. `batch_formats: ["TabSeparated","Values","JSONEachRow"]`; other formats → P4.1 path.
+- **Effort:** ~2–3 days after P4.1.
+- **Tests:** Matrix format × Content-Type.
+
+### P4.5 — Optional synchronous INSERT — open
+
+- **Problem:** Drivers expect CH HTTP semantics: error in response, not silent queue success.
+- **Proposal:** `sync_insert: true` or request header `X-Bulk-Sync: 1`: do not batch; `SendQuery` inline; return CH status/body/headers; journal ack after CH success (or dump). Dual-write: define policy (sync live only, backup async).
+- **Effort:** ~1–2 weeks (journal, timeouts, metrics, dual-write semantics).
+- **Risk:** Defeats throughput; document as debug / low-rate only.
+
+### P4.6 — Documentation & samples — partial
+
+- **Status:** ✅ [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md).
+- **Todo:** Optional `examples/go_direct_ch.go`, `examples/python_raw_insert.py` (non-blocking).
+
+### Recommended implementation order
+
+1. P4.6 (docs) ✅  
+2. P4.1 opaque passthrough  
+3. P4.2 decompression  
+4. P4.4 hybrid formats  
+5. P4.3 headers (proxied, then passthrough if sync)  
+6. P4.5 sync insert (only if product needs driver-drop-in)
+
+### Non-goals
+
+- Native TCP on bulk port.
+- Merging multiple Native INSERT bodies into one batch.
+- Exactly-once or full `clickhouse-connect` feature parity (sessions, temporary tables, external data) without explicit design.

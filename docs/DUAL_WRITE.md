@@ -161,3 +161,7 @@ See [ALERTS.md](./ALERTS.md).
 ## Operational risks
 
 See [RISKS.md](./RISKS.md) for live-only (journal on/off) and live+backup risk matrices and checklists.
+
+## Language clients (clickhouse-go, clickhouse-connect)
+
+Bulk is optimized for **HTTP INSERT batching** (TSV/VALUES), not as a full replacement for official drivers. See [CLIENT_COMPATIBILITY.md](./CLIENT_COMPATIBILITY.md).
