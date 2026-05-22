@@ -276,4 +276,4 @@ Bind `:8124` to internal networks or protect with reverse proxy auth.
 - [DUAL_WRITE.md](./DUAL_WRITE.md) — architecture, journal lifecycle, dumps
 - [ALERTS.md](./ALERTS.md) — Prometheus examples
 - [CONFIG.md](./CONFIG.md) — all settings
-- [Plan.md](../Plan.md) — resolved issues and optional follow-ups
+- [ROADMAP.md](./ROADMAP.md) — resolved issues and optional follow-ups

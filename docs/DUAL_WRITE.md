@@ -152,7 +152,7 @@ SIGINT/SIGTERM:
 
 ## Configuration
 
-See [CONFIG.md](./CONFIG.md). Precedence: defaults → JSON → env.
+See [CONFIG.md](./CONFIG.md). Precedence: defaults → JSON → env. Roadmap: [ROADMAP.md](./ROADMAP.md).
 
 ## Monitoring
 

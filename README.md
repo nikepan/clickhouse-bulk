@@ -40,7 +40,7 @@ Send INSERTs to `http://127.0.0.1:8124` (not the native ClickHouse port unless y
 | [docs/CONFIG.md](docs/CONFIG.md) | Full config and env reference |
 | [docs/ALERTS.md](docs/ALERTS.md) | Prometheus alert examples |
 | [CHANGELOG.md](CHANGELOG.md) | Change history |
-| [Plan.md](Plan.md) | Known issues / roadmap |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Known issues / roadmap |
 
 Dependency updates: [Dependabot](https://docs.github.com/en/code-security/dependabot) (`.github/dependabot.yml`) — weekly PRs for Go modules, GitHub Actions, and Docker base images.
 

@@ -2,7 +2,7 @@
 
 clickhouse-bulk is an **INSERT batching proxy** in front of ClickHouse’s [HTTP interface](https://clickhouse.com/docs/interfaces/http). It is **not** a drop-in replacement for official language clients.
 
-This document describes **current** behaviour and **planned** improvements. See [Plan.md](../Plan.md#p4--client-compatibility-optional) for the implementation roadmap.
+This document describes **current** behaviour and **planned** improvements. See [ROADMAP.md](./ROADMAP.md#p4--client-compatibility-optional) for the implementation roadmap.
 
 ---
 
@@ -161,7 +161,7 @@ client.raw_insert(
 
 ## Planned improvements (roadmap)
 
-See [Plan.md — P4 Client compatibility](../Plan.md#p4--client-compatibility-optional). Short overview:
+See [ROADMAP.md — P4 Client compatibility](./ROADMAP.md#p4--client-compatibility-optional). Short overview:
 
 | Phase | Feature | Unlocks |
 |-------|---------|---------|

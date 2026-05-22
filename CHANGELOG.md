@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Docs: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) (clickhouse-go, clickhouse-connect); P4 roadmap in [Plan.md](Plan.md).
+- Docs: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) (clickhouse-go, clickhouse-connect); roadmap in [docs/ROADMAP.md](docs/ROADMAP.md).
 - Dependabot: `.github/dependabot.yml` (gomod, github-actions, docker; weekly).
 - **Live / backup dual-write** when `clickhouse-backup.servers` or `CLICKHOUSE_BACKUP_SERVERS` is set.
 - `DualSender`, separate queues, dumps (`dump_dir`, `bkp_dump_dir`), and replay loops.
@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `Plan.md` renamed and moved to [docs/ROADMAP.md](docs/ROADMAP.md).
 - Go **1.26.3**; dependencies updated (echo v4.15.2, prometheus client_golang v1.23.2, testify v1.11.1, golang.org/x/*).
 - Go module: `github.com/itcrow/clickhouse-bulk` (was `github.com/nikepan/clickhouse-bulk`).
 - `RunServer` builds per-target senders; backup wrapped in `DualSender`.
@@ -37,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Notes
 
-- Dual-write is **best-effort per target**, not synchronous replication. See [Plan.md](Plan.md).
+- Dual-write is **best-effort per target**, not synchronous replication. See [docs/ROADMAP.md](docs/ROADMAP.md).
 - Fork base: upstream **v1.3.9** ([nikepan/clickhouse-bulk](https://github.com/nikepan/clickhouse-bulk)).
 
 ---

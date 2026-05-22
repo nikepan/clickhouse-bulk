@@ -1,9 +1,9 @@
-# Fix plan and known issues
+# Roadmap and known issues
 
 Code review of clickhouse-bulk (live + `clickhouse-backup` mode).  
 Dual-write semantics: **asynchronous replication with at-least-once delivery per target**, not a guarantee that live ≡ backup.
 
-See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [docs/CONFIG.md](docs/CONFIG.md), and [docs/ALERTS.md](docs/ALERTS.md).
+See [DUAL_WRITE.md](./DUAL_WRITE.md), [RISKS.md](./RISKS.md), [CONFIG.md](./CONFIG.md), [ALERTS.md](./ALERTS.md), and [CLIENT_COMPATIBILITY.md](./CLIENT_COMPATIBILITY.md).
 
 ---
 
@@ -19,7 +19,7 @@ See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [d
 
 ### 3. No coordination between live and backup — **done (docs + metrics)**
 
-- **Status:** ✅ [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/ALERTS.md](docs/ALERTS.md); metrics `ch_last_sent_unixtime`, `ch_bkp_last_sent_unixtime` for lag heuristics.
+- **Status:** ✅ [DUAL_WRITE.md](./DUAL_WRITE.md), [ALERTS.md](./ALERTS.md); metrics `ch_last_sent_unixtime`, `ch_bkp_last_sent_unixtime` for lag heuristics.
 
 ### 4. 4xx errors in dumps — infinite retry — **done**
 
@@ -31,7 +31,7 @@ See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [d
 
 ### 5. Double memory and load in backup mode — **documented**
 
-- **Status:** ✅ Documented in [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md); queue size 1000 per target.
+- **Status:** ✅ Documented in [DUAL_WRITE.md](./DUAL_WRITE.md); queue size 1000 per target.
 
 ### 6. Dump replay bypasses the send queue — **open**
 
@@ -51,7 +51,7 @@ See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [d
 
 ### 10. Env vs file order for backup TLS — **done**
 
-- **Status:** ✅ Documented in [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md#configuration-precedence).
+- **Status:** ✅ Documented in [DUAL_WRITE.md](./DUAL_WRITE.md#configuration-precedence).
 
 ---
 
@@ -95,7 +95,7 @@ See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [d
 
 ### 19. No health check for “backup lagging behind live” — **done**
 
-- **Status:** ✅ `ch_last_sent_unixtime` vs `ch_bkp_last_sent_unixtime`; alert example in ALERTS.md.
+- **Status:** ✅ `ch_last_sent_unixtime` vs `ch_bkp_last_sent_unixtime`; alert example in [ALERTS.md](./ALERTS.md).
 
 ### 20. `ch_bkp_*` metrics when backup mode is off — **done**
 
@@ -142,13 +142,13 @@ See [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md), [docs/RISKS.md](docs/RISKS.md), [d
 | `query_params` for backup | ✅ |
 | `config.sample-backup.json` | ✅ |
 | Journal (P0.01) | ✅ |
-| Plan items (open above) | P1.06, P4 (client compatibility) |
+| Roadmap items (open above) | P1.06, P4 (client compatibility) |
 
 ---
 
 ## P4 — Client compatibility (optional)
 
-Goal: improve interoperability with [clickhouse-go](https://github.com/ClickHouse/clickhouse-go) and [clickhouse-connect](https://clickhouse.com/docs/integrations/python) **without** turning bulk into a full HTTP proxy. Current behaviour: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md).
+Goal: improve interoperability with [clickhouse-go](https://github.com/ClickHouse/clickhouse-go) and [clickhouse-connect](https://clickhouse.com/docs/integrations/python) **without** turning bulk into a full HTTP proxy. Current behaviour: [CLIENT_COMPATIBILITY.md](./CLIENT_COMPATIBILITY.md).
 
 Design principle: **default path unchanged** (batched text INSERT for Vector/curl); new behaviour behind config flags.
 
@@ -194,7 +194,7 @@ Design principle: **default path unchanged** (batched text INSERT for Vector/cur
 
 ### P4.6 — Documentation & samples — partial
 
-- **Status:** ✅ [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md).
+- **Status:** ✅ [CLIENT_COMPATIBILITY.md](./CLIENT_COMPATIBILITY.md).
 - **Todo:** Optional `examples/go_direct_ch.go`, `examples/python_raw_insert.py` (non-blocking).
 
 ### Recommended implementation order
