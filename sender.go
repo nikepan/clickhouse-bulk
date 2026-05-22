@@ -24,12 +24,15 @@ type fakeSender struct {
 func (s *fakeSender) Send(r *ClickhouseRequest) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sendHistory = append(s.sendHistory, r.Params+" "+r.Content)
+	s.sendHistory = append(s.sendHistory, logInsertMeta(r.Params, r.Content))
 }
 
 func (s *fakeSender) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
-	s.sendQueryHistory = append(s.sendQueryHistory, r.Params+r.Content)
-	log.Printf("DEBUG: send query: %+v\n", s.sendQueryHistory)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	meta := logInsertMeta(r.Params, r.Content)
+	s.sendQueryHistory = append(s.sendQueryHistory, meta)
+	log.Printf("DEBUG: send query #%d %s\n", len(s.sendQueryHistory), meta)
 	return "", http.StatusOK, nil
 }
 

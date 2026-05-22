@@ -24,6 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Validate `journal_dir`, `dump_dir`, `bkp_dump_dir` at startup (reject `..` path traversal).
+- Sanitize dump file ids in `GetDumpData` / `DeleteDump` / replay (`failed/<basename>` only).
+- Redact passwords/tokens in logs; do not log full INSERT body on empty insert / errors.
 - Graceful shutdown: HTTP stop → `SafeQuit` → drain live/backup queues (`shutdown_drain_sec`).
 - 4xx dumps moved to `failed/` (no infinite retry).
 - `CleanTables` / mutex fixes; server URL validation and trim.

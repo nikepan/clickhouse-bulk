@@ -64,7 +64,8 @@ func (server *Server) writeHandler(c echo.Context) error {
 	s := string(q)
 
 	if server.Debug {
-		log.Printf("DEBUG: query %+v %+v\n", c.QueryString(), s)
+		log.Printf("DEBUG: %s body_bytes=%d snippet=%q\n",
+			logInsertMeta(c.QueryString(), s), len(s), logTruncate(s, 64))
 	}
 
 	qs := c.QueryString()
@@ -79,7 +80,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 	params, content, insert := server.Collector.ParseQuery(qs, s)
 	if insert {
 		if len(content) == 0 {
-			log.Printf("INFO: empty insert params: [%+v] content: [%+v]\n", params, content)
+			log.Printf("INFO: empty insert %s\n", logInsertMeta(params, content))
 			return c.String(http.StatusInternalServerError, "Empty insert\n")
 		}
 		var journalID uint64

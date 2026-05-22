@@ -80,3 +80,29 @@ func TestDump_ReplayFailed(t *testing.T) {
 
 	os.RemoveAll(dumpDir)
 }
+
+func TestSafeDumpRelPath(t *testing.T) {
+	rel, err := safeDumpRelPath("dump209901011200001-502-1.dmp")
+	assert.NoError(t, err)
+	assert.Equal(t, "dump209901011200001-502-1.dmp", rel)
+
+	rel, err = safeDumpRelPath(path.Join("failed", "dump209901011200002-400-1.dmp"))
+	assert.NoError(t, err)
+	assert.Equal(t, "failed/dump209901011200002-400-1.dmp", rel)
+
+	_, err = safeDumpRelPath("../secret.dmp")
+	assert.ErrorIs(t, err, ErrInvalidDumpID)
+
+	_, err = safeDumpRelPath("dumps/../../etc/passwd")
+	assert.ErrorIs(t, err, ErrInvalidDumpID)
+
+	_, err = safeDumpRelPath("failed/../../../etc/passwd")
+	assert.ErrorIs(t, err, ErrInvalidDumpID)
+}
+
+func TestDump_GetDumpDataRejectsTraversal(t *testing.T) {
+	dumper := NewDumper("dumptest-traversal")
+	_, _, err := dumper.GetDumpData("../../etc/passwd")
+	assert.ErrorIs(t, err, ErrInvalidDumpID)
+	os.RemoveAll("dumptest-traversal")
+}

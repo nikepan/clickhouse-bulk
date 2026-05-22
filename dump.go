@@ -27,6 +27,9 @@ var clientErrorDumpPattern = regexp.MustCompile(`^dump\d{14}` + dumpKindClientEr
 // ErrNoDumps - signal that dumps not found
 var ErrNoDumps = errors.New("No dumps")
 
+// ErrInvalidDumpID is returned when a dump file id contains path traversal or invalid components.
+var ErrInvalidDumpID = errors.New("invalid dump file id")
+
 // Dumper - interface for dump data
 type Dumper interface {
 	Dump(params string, data string, response string, prefix string, status int) error
@@ -43,8 +46,44 @@ type FileDumper struct {
 	mu           sync.Mutex
 }
 
-func (d *FileDumper) makePath(id string) string {
-	return path.Join(d.Path, id)
+// safeDumpRelPath validates dump file ids from disk listings or replay (basename or failed/<basename> only).
+func safeDumpRelPath(id string) (string, error) {
+	if strings.Contains(filepath.ToSlash(id), "..") {
+		return "", ErrInvalidDumpID
+	}
+	clean := filepath.Clean(id)
+	slash := filepath.ToSlash(clean)
+	if slash == failedDumpSubdir {
+		return "", ErrInvalidDumpID
+	}
+	if strings.HasPrefix(slash, failedDumpSubdir+"/") {
+		base := filepath.Base(clean)
+		if base == "" || base == "." || base == ".." {
+			return "", ErrInvalidDumpID
+		}
+		return path.Join(failedDumpSubdir, base), nil
+	}
+	if strings.Contains(slash, "/") {
+		return "", ErrInvalidDumpID
+	}
+	base := filepath.Base(clean)
+	if base == "" || base == "." || base == ".." {
+		return "", ErrInvalidDumpID
+	}
+	return base, nil
+}
+
+func (d *FileDumper) makePath(id string) (string, error) {
+	rel, err := safeDumpRelPath(id)
+	if err != nil {
+		return "", err
+	}
+	full := path.Join(d.Path, rel)
+	// Ensure resolved path stays under dump root.
+	if relCheck, err := filepath.Rel(d.Path, full); err != nil || strings.HasPrefix(relCheck, "..") || relCheck == ".." {
+		return "", ErrInvalidDumpID
+	}
+	return full, nil
 }
 
 func (d *FileDumper) checkDir(create bool) error {
@@ -126,7 +165,11 @@ func (d *FileDumper) pruneOldestIfNeeded() {
 	}
 	for len(files) > d.MaxDumpFiles {
 		oldest := files[0]
-		if err := os.Remove(d.makePath(oldest)); err != nil {
+		p, err := d.makePath(oldest)
+		if err != nil {
+			break
+		}
+		if err := os.Remove(p); err != nil {
 			log.Printf("ERROR: prune dump %+v: %+v\n", oldest, err)
 			break
 		}
@@ -183,8 +226,11 @@ func (d *FileDumper) GetDump() (string, error) {
 
 // GetDumpData - get dump data from filesystem
 func (d *FileDumper) GetDumpData(id string) (data string, response string, err error) {
-	path := d.makePath(id)
-	s, err := os.ReadFile(path)
+	filePath, err := d.makePath(id)
+	if err != nil {
+		return "", "", err
+	}
+	s, err := os.ReadFile(filePath)
 	items := strings.Split(string(s), dumpResponseMark)
 	if len(items) > 1 {
 		return items[0], items[1], err
@@ -201,11 +247,18 @@ func (d *FileDumper) failedDir() string {
 }
 
 func (d *FileDumper) moveToFailed(name string) error {
+	safeName, err := safeDumpRelPath(name)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(d.failedDir(), 0766); err != nil {
 		return err
 	}
-	src := d.makePath(name)
-	dst := path.Join(d.failedDir(), name)
+	src, err := d.makePath(safeName)
+	if err != nil {
+		return err
+	}
+	dst := path.Join(d.failedDir(), safeName)
 	if err := os.Rename(src, dst); err != nil {
 		return err
 	}
@@ -213,12 +266,14 @@ func (d *FileDumper) moveToFailed(name string) error {
 	return nil
 }
 
-// DeleteDump - get dump data from filesystem
+// DeleteDump - remove a dump file by id (basename or failed/<basename>).
 func (d *FileDumper) DeleteDump(id string) error {
-	path := d.makePath(id)
-	var err error
+	filePath, err := d.makePath(id)
+	if err != nil {
+		return err
+	}
 	for attempt := 0; attempt < 3; attempt++ {
-		err = os.Remove(path)
+		err = os.Remove(filePath)
 		if err == nil {
 			return nil
 		}
@@ -328,7 +383,14 @@ func (d *FileDumper) ReplayFailed(sender Sender, limit int) FailedReplayReport {
 			log.Printf("ERROR: replay failed dump %s: (%+v) %+v\n", name, status, err)
 			continue
 		}
-		if err := os.Remove(d.makePath(rel)); err != nil {
+		rmPath, err := d.makePath(rel)
+		if err != nil {
+			item.Error = err.Error()
+			report.Errors++
+			report.Items = append(report.Items, item)
+			continue
+		}
+		if err := os.Remove(rmPath); err != nil {
 			item.Error = "sent but delete failed: " + err.Error()
 			report.Errors++
 			report.Items = append(report.Items, item)

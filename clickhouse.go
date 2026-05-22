@@ -186,7 +186,7 @@ func (c *Clickhouse) Run() {
 			data := datas[0].(*ClickhouseRequest)
 			resp, status, err := c.SendQuery(data)
 			if err != nil {
-				log.Printf("ERROR: Send (%+v) %+v; response %+v\n", status, err, resp)
+				log.Printf("ERROR: Send status=%+v err=%+v response=%s\n", status, err, logTruncate(resp, 256))
 				prefix := "1"
 				if status >= 400 && status < 502 {
 					prefix = "2"
@@ -221,7 +221,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 			url += "?" + r.Params
 		}
 		if r.isInsert && srv.LogQueries {
-			log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+			log.Printf("INFO: sending %+v rows to %+v query=%q\n", r.Count, srv.URL, logTruncate(r.Query, 200))
 		}
 		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
 		if err != nil {
@@ -230,7 +230,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		}
 		defer resp.Body.Close()
 		if r.isInsert && srv.LogQueries {
-			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+			log.Printf("INFO: sent %+v rows to %+v query=%q\n", r.Count, srv.URL, logTruncate(r.Query, 200))
 		}
 		buf, _ := io.ReadAll(resp.Body)
 		s := string(buf)
@@ -238,7 +238,8 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 			srv.Bad = true
 			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
-			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)
+			err = fmt.Errorf("wrong server status %d: response: %s (request %d bytes)",
+				resp.StatusCode, logTruncate(s, 512), len(r.Content))
 		}
 		return s, resp.StatusCode, err
 	}

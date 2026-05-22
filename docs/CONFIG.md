@@ -4,6 +4,10 @@ Config file: JSON (default `config.json`). Override via environment variables (D
 
 **Precedence:** defaults → JSON file → environment variables.
 
+**Local data paths** (`journal_dir`, `dump_dir`, `bkp_dump_dir`): validated at startup — paths are `filepath.Clean`’d; values containing `..` are rejected. Empty `journal_dir` disables the journal.
+
+**Dump file ids** (replay / read): only a basename or `failed/<basename>` is allowed; `..` and nested paths are rejected (`ErrInvalidDumpID`).
+
 ## Top-level
 
 | Key | Env | Default | Description |
@@ -23,7 +27,7 @@ Config file: JSON (default `config.json`). Override via environment variables (D
 | `journal_fsync` | `JOURNAL_FSYNC` | `false` | `fsync` after each WAL append |
 | `max_journal_pending` | `MAX_JOURNAL_PENDING` | `0` | Max unacked WAL rows; `0` = unlimited; full → HTTP 503 |
 | `shutdown_drain_sec` | `SHUTDOWN_DRAIN_SEC` | `60` | Max time to flush queues on SIGTERM/SIGINT |
-| `debug` | `CLICKHOUSE_BULK_DEBUG` | `false` | Log incoming HTTP requests |
+| `debug` | `CLICKHOUSE_BULK_DEBUG` | `false` | Log request metadata (redacted params, byte counts); not full row data |
 | `log_queries` | `LOG_QUERIES` | `false` | Log each insert batch sent to CH |
 | `metrics_prefix` | `METRICS_PREFIX` | `""` | Prometheus metric name prefix |
 | `use_tls` | — | `false` | TLS for HTTP listener |

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -163,6 +164,37 @@ func mergeQueryParams(base, extra string) string {
 	return base + "&" + extra
 }
 
+// validateLocalDataDir normalizes admin-configured local paths and rejects traversal (..).
+// Empty dir disables that feature (e.g. journal_dir "").
+func validateLocalDataDir(dir, field string) (string, error) {
+	if dir == "" {
+		return "", nil
+	}
+	clean := filepath.Clean(dir)
+	if clean == "." || clean == ".." {
+		return "", fmt.Errorf("%s: invalid path %q", field, dir)
+	}
+	slash := filepath.ToSlash(dir)
+	if strings.HasPrefix(slash, "../") || strings.Contains(slash, "/../") {
+		return "", fmt.Errorf("%s: path must not contain '..'", field)
+	}
+	return clean, nil
+}
+
+func validateConfigDataDirs(cnf *Config) error {
+	var err error
+	if cnf.DumpDir, err = validateLocalDataDir(cnf.DumpDir, "dump_dir"); err != nil {
+		return err
+	}
+	if cnf.BkpDumpDir, err = validateLocalDataDir(cnf.BkpDumpDir, "bkp_dump_dir"); err != nil {
+		return err
+	}
+	if cnf.JournalDir, err = validateLocalDataDir(cnf.JournalDir, "journal_dir"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func validateClickhouseConfig(name string, ch clickhouseConfig) error {
 	if len(ch.Servers) == 0 {
 		return fmt.Errorf("%s: no servers configured", name)
@@ -260,6 +292,9 @@ func ReadConfig(configFile string) (Config, error) {
 	}
 	if cnf.ShutdownDrainSec <= 0 {
 		cnf.ShutdownDrainSec = 60
+	}
+	if err := validateConfigDataDirs(&cnf); err != nil {
+		return Config{}, err
 	}
 
 	log.Printf("Using servers: %+v", strings.Join(cnf.Clickhouse.Servers, ", "))

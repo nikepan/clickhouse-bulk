@@ -7,6 +7,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestValidateLocalDataDir(t *testing.T) {
+	clean, err := validateLocalDataDir("journal", "journal_dir")
+	assert.NoError(t, err)
+	assert.Equal(t, "journal", clean)
+
+	clean, err = validateLocalDataDir("/var/lib/bulk/journal", "journal_dir")
+	assert.NoError(t, err)
+	assert.Equal(t, "/var/lib/bulk/journal", clean)
+
+	_, err = validateLocalDataDir("../etc", "dump_dir")
+	assert.Error(t, err)
+
+	_, err = validateLocalDataDir("dumps/../../tmp", "dump_dir")
+	assert.Error(t, err)
+
+	_, err = validateLocalDataDir("..", "journal_dir")
+	assert.Error(t, err)
+
+	_, err = validateLocalDataDir("", "journal_dir")
+	assert.NoError(t, err)
+}
+
+func TestReadConfig_RejectsTraversalPaths(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_config_*.json")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(`{"journal_dir":"../outside","clickhouse":{"servers":["http://127.0.0.1:8123"]}}`)
+	assert.NoError(t, err)
+	tmpFile.Close()
+
+	_, err = ReadConfig(tmpFile.Name())
+	assert.Error(t, err)
+}
+
 func TestReadConfig(t *testing.T) {
 	// Test with a non-existent file (should use defaults)
 	cnf, err := ReadConfig("non_existent_config.json")
