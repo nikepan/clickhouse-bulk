@@ -7,4 +7,4 @@ build:
 	go build
 
 docker_build:
-	docker build -t clickhouse-bulk .
+	docker build -t itcrow/clickhouse-bulk:local .

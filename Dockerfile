@@ -23,5 +23,5 @@ WORKDIR /app
 RUN mkdir /app/dumps
 COPY --from=builder /go/src/github.com/itcrow/clickhouse-bulk/config.sample.json .
 COPY --from=builder /go/src/github.com/itcrow/clickhouse-bulk/clickhouse-bulk .
-EXPOSE 8123
+EXPOSE 8124
 ENTRYPOINT ["./clickhouse-bulk", "-config=config.sample.json"]

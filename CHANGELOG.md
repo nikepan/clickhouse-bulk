@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- [docs/DOCKER.md](docs/DOCKER.md) — Docker Hub link, run/how-to, `docker push itcrow/clickhouse-bulk:tagname`.
 - Docs: [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) (clickhouse-go, clickhouse-connect); roadmap in [docs/ROADMAP.md](docs/ROADMAP.md).
 - Dependabot: `.github/dependabot.yml` (gomod, github-actions, docker; weekly).
 - **Live / backup dual-write** when `clickhouse-backup.servers` or `CLICKHOUSE_BACKUP_SERVERS` is set.

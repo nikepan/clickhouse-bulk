@@ -2,5 +2,5 @@ FROM alpine:3
 WORKDIR /app
 COPY config.sample.json .
 COPY clickhouse-bulk .
-EXPOSE 8123
+EXPOSE 8124
 ENTRYPOINT ["./clickhouse-bulk", "-config=config.sample.json"]

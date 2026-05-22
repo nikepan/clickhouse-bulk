@@ -1,7 +1,10 @@
 # ClickHouse-Bulk (live / standby fork)
 
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/377aec62806f4ba4a58042374eb1fc1d)](https://app.codacy.com/gh/itcrow/clickhouse-bulk/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/377aec62806f4ba4a58042374eb1fc1d)](https://app.codacy.com/gh/itcrow/clickhouse-bulk/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 [![build](https://github.com/itcrow/clickhouse-bulk/actions/workflows/test.yml/badge.svg)](https://github.com/itcrow/clickhouse-bulk/actions/workflows/test.yml)
 [![download binaries](https://img.shields.io/badge/binaries-download-blue.svg)](https://github.com/itcrow/clickhouse-bulk/releases)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-itcrow%2Fclickhouse--bulk-blue)](https://hub.docker.com/r/itcrow/clickhouse-bulk/)
 
 HTTP insert collector for [ClickHouse](https://clickhouse.com/). Batches INSERTs and sends them to one or two ClickHouse endpoints (live + optional standby).
 
@@ -21,6 +24,19 @@ Based on [nikepan/clickhouse-bulk](https://github.com/nikepan/clickhouse-bulk) w
 
 ## Quick start
 
+**Docker** ([registry](https://hub.docker.com/r/itcrow/clickhouse-bulk/), [how-to](docs/DOCKER.md)):
+
+```bash
+docker pull itcrow/clickhouse-bulk:latest
+docker run -d -p 8124:8124 \
+  -e CLICKHOUSE_SERVERS=http://127.0.0.1:8123 \
+  -v "$(pwd)/config.json:/app/config.json:ro" \
+  itcrow/clickhouse-bulk:latest \
+  ./clickhouse-bulk -config=/app/config.json
+```
+
+**From source:**
+
 ```bash
 cp config.sample.json config.json   # live + journal
 # or: cp config.sample-backup.json config.json
@@ -37,6 +53,7 @@ Send INSERTs to `http://127.0.0.1:8124` (not the native ClickHouse port unless y
 | [docs/DUAL_WRITE.md](docs/DUAL_WRITE.md) | Architecture, journal, dumps, guarantees |
 | [docs/RISKS.md](docs/RISKS.md) | Operational risks by mode (live / journal / dual-write) |
 | [docs/CLIENT_COMPATIBILITY.md](docs/CLIENT_COMPATIBILITY.md) | clickhouse-go, clickhouse-connect, HTTP driver fit |
+| [docs/DOCKER.md](docs/DOCKER.md) | Docker Hub, run, volumes, build/push |
 | [docs/CONFIG.md](docs/CONFIG.md) | Full config and env reference |
 | [docs/ALERTS.md](docs/ALERTS.md) | Prometheus alert examples |
 | [CHANGELOG.md](CHANGELOG.md) | Change history |
@@ -180,9 +197,11 @@ If upload fails with `Request URL not found`:
 
 ## Installation
 
-- [Releases](https://github.com/itcrow/clickhouse-bulk/releases)
-- [Docker](https://hub.docker.com/r/itcrow/clickhouse-bulk/)
+- [Releases](https://github.com/itcrow/clickhouse-bulk/releases) (binaries)
+- [Docker Hub — `itcrow/clickhouse-bulk`](https://hub.docker.com/r/itcrow/clickhouse-bulk/) — `docker pull itcrow/clickhouse-bulk:latest` ([run guide](docs/DOCKER.md))
 - From source (Go 1.26+): `go build`
+
+Publish a custom tag: `docker push itcrow/clickhouse-bulk:tagname` (see [docs/DOCKER.md](docs/DOCKER.md#build-and-push-maintainers)).
 
 ## License
 
