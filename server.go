@@ -90,15 +90,7 @@ func (server *Server) freeMemHandler(c echo.Context) error {
 
 // manual trigger for cleaning tables
 func (server *Server) tablesCleanHandler(c echo.Context) error {
-	log.Printf("DEBUG: clean tables:\n%+v", server.Collector.Tables)
-	for k, t := range server.Collector.Tables {
-		log.Printf("DEBUG: check if table is empty: %+v with key:%+v\n", t, k)
-		if ok := t.Empty(); ok {
-			log.Printf("DEBUG: delete empty table: %+v with key:%+v\n", t, k)
-			server.Collector.Tables[k].CleanTable()
-			defer delete(server.Collector.Tables, k)
-		}
-	}
+	server.Collector.CleanEmptyTables()
 	return c.JSON(200, Status{Status: "cleaned empty tables"})
 }
 

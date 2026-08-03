@@ -133,6 +133,27 @@ func TestServer_MultiServer(t *testing.T) {
 	time.Sleep(1000)
 }
 
+func TestServer_TablesCleanHandlerConcurrent(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, true, false)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 500; i++ {
+			collector.Push(fmt.Sprintf("query=%d", i), "data")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			status, _ := request("GET", "/debug/tables-clean", "", server.echo)
+			assert.Equal(t, http.StatusOK, status)
+		}
+	}()
+	wg.Wait()
+}
+
 func request(method, path string, body string, e *echo.Echo) (int, string) {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	rec := httptest.NewRecorder()
