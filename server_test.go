@@ -154,6 +154,17 @@ func TestServer_TablesCleanHandlerConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
+func TestServer_WriteHandlerStoresBeforeResponding(t *testing.T) {
+	sender := &fakeSender{}
+	collector := NewCollector(sender, 1, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	status, _ := request("POST", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	sender.mu.Lock()
+	defer sender.mu.Unlock()
+	assert.Len(t, sender.sendHistory, 1)
+}
+
 func request(method, path string, body string, e *echo.Echo) (int, string) {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	rec := httptest.NewRecorder()

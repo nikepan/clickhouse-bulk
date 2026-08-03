@@ -67,7 +67,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 			log.Printf("INFO: empty insert params: [%+v] content: [%+v]\n", params, content)
 			return c.String(http.StatusInternalServerError, "Empty insert\n")
 		}
-		go server.Collector.Push(params, content)
+		server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
 	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, isInsert: false})
