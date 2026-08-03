@@ -66,6 +66,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
   "clickhouse": {
     "down_timeout": 60, // wait if server in down (seconds)
     "connect_timeout": 10, // wait for server connect (seconds)
+    "send_timeout": 60, // max duration of the whole insert request (seconds)
     "tls_server_name": "", // override TLS serverName for certificate verification (e.g. in cases you share same "cluster" certificate across multiple nodes)
     "insecure_tls_skip_verify": false, // INSECURE - skip certificate verification at all
     "servers": [
@@ -86,6 +87,7 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 * `DUMP_CHECK_INTERVAL` - interval of resend dumps
 * `CLICKHOUSE_DOWN_TIMEOUT` - wait time if server is down
 * `CLICKHOUSE_CONNECT_TIMEOUT` - clickhouse server connect timeout
+* `CLICKHOUSE_SEND_TIMEOUT` - max duration of the whole insert request
 * `CLICKHOUSE_TLS_SERVER_NAME` - server name for TLS certificate verification
 * `CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY` - skip certificate verification at all
 * `METRICS_PREFIX` - prefix for prometheus metrics

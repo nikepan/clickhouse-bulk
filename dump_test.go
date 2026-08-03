@@ -10,7 +10,7 @@ import (
 )
 
 func TestDump_Dump(t *testing.T) {
-	c := NewClickhouse(-1, 10, "", false)
+	c := NewClickhouse(-1, 10, 0, "", false)
 	dumpDir := "dumptest"
 	dumper := NewDumper(dumpDir)
 	c.Dumper = dumper

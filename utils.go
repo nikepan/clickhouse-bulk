@@ -16,6 +16,7 @@ type clickhouseConfig struct {
 	TLSSkipVerify  bool     `json:"insecure_tls_skip_verify"`
 	DownTimeout    int      `json:"down_timeout"`
 	ConnectTimeout int      `json:"connect_timeout"`
+	SendTimeout    int      `json:"send_timeout"`
 }
 
 // Config stores config data
@@ -54,6 +55,7 @@ func defaultConfig() Config {
 		Clickhouse: clickhouseConfig{
 			DownTimeout:    60,
 			ConnectTimeout: 10,
+			SendTimeout:    60,
 			TLSServerName:  "",
 			TLSSkipVerify:  false,
 			Servers:        []string{"http://127.0.0.1:8123"},
@@ -132,6 +134,7 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
 	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
+	readEnvInt("CLICKHOUSE_SEND_TIMEOUT", &cnf.Clickhouse.SendTimeout)
 	readEnvString("CLICKHOUSE_TLS_SERVER_NAME", &cnf.Clickhouse.TLSServerName)
 	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.TLSSkipVerify)
 	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
