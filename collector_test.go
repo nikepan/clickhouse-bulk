@@ -162,6 +162,34 @@ func TestTable_CheckFlush(t *testing.T) {
 	assert.True(t, count >= 9)
 }
 
+func TestTable_CleanTableReleasesMutex(t *testing.T) {
+	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	c.AddTable("test")
+	tbl := c.Tables["test"]
+	tbl.CleanTable()
+	done := make(chan struct{})
+	go func() {
+		tbl.GetCount()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("table mutex is still locked after CleanTable")
+	}
+}
+
+func TestCollector_CleanTablesFlushesPendingRows(t *testing.T) {
+	sender := &fakeSender{}
+	c := NewCollector(sender, 1000, 1000000, 0, true)
+	c.CleanInterval = 1
+	c.Push(escTitle, qContent)
+	c.Tables[escTitle].lastUpdate = time.Now().Add(-time.Hour)
+	c.CleanTables()
+	assert.Len(t, sender.sendHistory, 1)
+	assert.Len(t, c.Tables, 0)
+}
+
 func TestCollector_FlushAll(t *testing.T) {
 	c := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	c.Push(qTitle, qContent)
