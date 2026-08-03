@@ -42,7 +42,8 @@ func (d *FileDumper) checkDir(create bool) error {
 	_, err := os.Stat(d.Path)
 	if os.IsNotExist(err) {
 		if create {
-			return os.Mkdir(d.Path, 0766)
+			// dumps may contain credentials from basic auth, keep them owner-only
+			return os.Mkdir(d.Path, 0700)
 		}
 	}
 	return err
@@ -57,6 +58,7 @@ func NewDumper(path string) *FileDumper {
 	d := new(FileDumper)
 	d.Path = path
 	d.DumpPrefix = time.Now().Format("20060102150405")
+	d.LockedFiles = make(map[string]bool)
 	return d
 }
 
@@ -74,7 +76,7 @@ func (d *FileDumper) Dump(params string, content string, response string, prefix
 	}
 	d.DumpNum++
 	file_path := path.Join(d.Path, d.dumpName(d.DumpNum, prefix, status))
-	err = os.WriteFile(file_path, []byte(data), 0644)
+	err = os.WriteFile(file_path, []byte(data), 0600)
 	if err != nil {
 		log.Printf("ERROR: dump to file: %+v\n", err)
 	} else {
@@ -163,13 +165,29 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 		query := ""
 		lines := strings.Split(data, "\n")
 		if !HasPrefix(lines[0], "insert") {
+			if len(lines) < 2 {
+				// truncated dump (params line without data): sending it is
+				// impossible, skip it until restart instead of panicking
+				d.mu.Lock()
+				d.LockedFiles[f] = true
+				d.mu.Unlock()
+				return fmt.Errorf("dump %+v is corrupted, skipping until restart", f)
+			}
 			params = lines[0]
 			query = lines[1]
 			data = strings.Join(lines[1:], "\n")
 		}
 		_, status, err := sender.SendQuery(&ClickhouseRequest{Params: params, Content: data, Query: query, Count: len(lines[2:]), isInsert: true})
 		if err != nil {
-			return fmt.Errorf("server error (%+v) %+v", status, err)
+			if errors.Is(err, ErrServerIsDown) || errors.Is(err, ErrNoServers) {
+				return fmt.Errorf("server error (%+v) %+v", status, err)
+			}
+			// the server rejected the dump itself (e.g. 4xx): retrying it
+			// forever would block all newer dumps, so skip it until restart
+			d.mu.Lock()
+			d.LockedFiles[f] = true
+			d.mu.Unlock()
+			return fmt.Errorf("dump %+v rejected, skipping until restart: (%+v) %+v", f, status, err)
 		}
 		log.Printf("INFO: dump sent: %+v\n", f)
 	}
@@ -187,7 +205,6 @@ func (d *FileDumper) ProcessNextDump(sender Sender) error {
 
 // Listen - reads dumps from disk and try to send it
 func (d *FileDumper) Listen(sender Sender, interval int) {
-	d.LockedFiles = make(map[string]bool)
 	if interval == 0 {
 		interval = defaultDumpCheckInterval
 	}
