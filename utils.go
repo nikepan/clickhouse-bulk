@@ -66,10 +66,10 @@ func defaultConfig() Config {
 // ReadJSON - read json file to struct
 func ReadJSON(fn string, v interface{}) error {
 	file, err := os.Open(fn)
-	defer file.Close()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	decoder := json.NewDecoder(file)
 	return decoder.Decode(v)
 }
@@ -85,21 +85,22 @@ func readEnvInt(name string, value *int) {
 		v, err := strconv.Atoi(s)
 		if err != nil {
 			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		} else {
+			*value = v
 		}
-		*value = v
 	}
 }
 
 func readEnvBool(name string, value *bool) {
-    s := os.Getenv(name)
-    if s != "" {
-        v, err := strconv.ParseBool(s)
-        if err != nil {
-            log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
-        } else {
-            *value = v
-        }
-    }
+	s := os.Getenv(name)
+	if s != "" {
+		v, err := strconv.ParseBool(s)
+		if err != nil {
+			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		} else {
+			*value = v
+		}
+	}
 }
 
 func readEnvString(name string, value *string) {
@@ -108,7 +109,6 @@ func readEnvString(name string, value *string) {
 		*value = s
 	}
 }
-
 
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {

@@ -58,6 +58,17 @@ func TestEnvOverrides(t *testing.T) {
 	assert.True(t, cnf.Debug)
 }
 
+func TestEnvOverrideInvalidInt(t *testing.T) {
+	os.Setenv("CLICKHOUSE_FLUSH_COUNT", "notanumber")
+	defer os.Unsetenv("CLICKHOUSE_FLUSH_COUNT")
+
+	cnf, err := ReadConfig("non_existent_config.json")
+	assert.Nil(t, err)
+
+	// invalid env value must not override the default with zero
+	assert.Equal(t, 10000, cnf.FlushCount)
+}
+
 func TestConfigFileStructure(t *testing.T) {
 	// Check that the sample config file exists and is valid JSON
 	_, err := os.Stat("config.sample.json")
