@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -36,14 +38,18 @@ var queuedDumps = prometheus.NewGauge(
 		Help: "Actual dump files id directory",
 	})
 
+var initMetricsOnce sync.Once
+
 // InitMetrics - init prometheus metrics
 func InitMetrics(prefix string) {
-	prometheus.DefaultRegisterer = prometheus.WrapRegistererWithPrefix(prefix, prometheus.DefaultRegisterer)
+	initMetricsOnce.Do(func() {
+		prometheus.DefaultRegisterer = prometheus.WrapRegistererWithPrefix(prefix, prometheus.DefaultRegisterer)
 
-	prometheus.MustRegister(pushCounter)
-	prometheus.MustRegister(sentCounter)
-	prometheus.MustRegister(dumpCounter)
-	prometheus.MustRegister(queuedDumps)
-	prometheus.MustRegister(goodServers)
-	prometheus.MustRegister(badServers)
+		prometheus.MustRegister(pushCounter)
+		prometheus.MustRegister(sentCounter)
+		prometheus.MustRegister(dumpCounter)
+		prometheus.MustRegister(queuedDumps)
+		prometheus.MustRegister(goodServers)
+		prometheus.MustRegister(badServers)
+	})
 }
