@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -145,6 +146,34 @@ func TestServer_TablesCleanHandlerConcurrent(t *testing.T) {
 		}
 	}()
 	wg.Wait()
+}
+
+func TestServer_DebugEndpointsRequireDebugMode(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	for _, p := range []string{"/debug/gc", "/debug/freemem", "/debug/pprof/", "/debug/tables-clean"} {
+		status, _ := request("GET", p, "", server.echo)
+		assert.Equal(t, http.StatusNotFound, status, p)
+	}
+
+	debugCollector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	debugServer := InitServer("", debugCollector, true, false)
+	for _, p := range []string{"/debug/gc", "/debug/freemem", "/debug/tables-clean"} {
+		status, _ := request("GET", p, "", debugServer.echo)
+		assert.Equal(t, http.StatusOK, status, p)
+	}
+}
+
+func TestServer_BasicAuthEscaped(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	status, _ := authRequest("POST", "user&1", "p&ss=w@rd", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Len(t, collector.Tables, 1)
+	for k := range collector.Tables {
+		assert.Contains(t, k, "user="+url.QueryEscape("user&1"))
+		assert.Contains(t, k, "password="+url.QueryEscape("p&ss=w@rd"))
+	}
 }
 
 func TestServer_WriteHandlerStoresBeforeResponding(t *testing.T) {

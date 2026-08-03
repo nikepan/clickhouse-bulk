@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -56,10 +57,11 @@ func (server *Server) writeHandler(c echo.Context) error {
 	qs := c.QueryString()
 	user, password, ok := c.Request().BasicAuth()
 	if ok {
+		auth := "user=" + url.QueryEscape(user) + "&password=" + url.QueryEscape(password)
 		if qs == "" {
-			qs = "user=" + user + "&password=" + password
+			qs = auth
 		} else {
-			qs = "user=" + user + "&password=" + password + "&" + qs
+			qs = auth + "&" + qs
 		}
 	}
 	params, content, insert := server.Collector.ParseQuery(qs, s)
@@ -115,11 +117,14 @@ func InitServer(listen string, collector *Collector, debug bool, logQueries bool
 	server.echo.POST("/", server.writeHandler)
 	server.echo.GET("/status", server.statusHandler)
 	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
-	// debug stuff
-	server.echo.GET("/debug/gc", server.gcHandler)
-	server.echo.GET("/debug/freemem", server.freeMemHandler)
-	server.echo.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
-	server.echo.GET("/debug/tables-clean", server.tablesCleanHandler)
+	if debug {
+		// debug endpoints expose internals and have no auth,
+		// keep them off unless debug mode is enabled explicitly
+		server.echo.GET("/debug/gc", server.gcHandler)
+		server.echo.GET("/debug/freemem", server.freeMemHandler)
+		server.echo.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+		server.echo.GET("/debug/tables-clean", server.tablesCleanHandler)
+	}
 
 	return server
 }
