@@ -8,6 +8,7 @@
   "debug": false,
   "log_queries": true,
   "dump_dir": "dumps",
+  "max_body_size": "",
   "clickhouse": {
     "down_timeout": 60,
     "connect_timeout": 10,

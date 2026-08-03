@@ -176,6 +176,18 @@ func TestServer_BasicAuthEscaped(t *testing.T) {
 	}
 }
 
+func TestServer_BodyLimit(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	server.SetBodyLimit("1K")
+	big := strings.Repeat("a", 2048)
+	status, _ := request("POST", "/?query="+escTitle, big, server.echo)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, status)
+
+	status, _ = request("POST", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+}
+
 func TestServer_WriteHandlerStoresBeforeResponding(t *testing.T) {
 	sender := &fakeSender{}
 	collector := NewCollector(sender, 1, 1000, 0, true)

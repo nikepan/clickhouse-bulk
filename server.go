@@ -18,6 +18,7 @@ import (
 	"runtime/debug"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -97,6 +98,11 @@ func (server *Server) tablesCleanHandler(c echo.Context) error {
 	return c.JSON(200, Status{Status: "cleaned empty tables"})
 }
 
+// SetBodyLimit - reject requests with body larger than limit (echo format, e.g. "100M")
+func (server *Server) SetBodyLimit(limit string) {
+	server.echo.Use(middleware.BodyLimit(limit))
+}
+
 // Start - start http server
 func (server *Server) Start(cnf Config) error {
 	if cnf.UseTLS {
@@ -155,6 +161,9 @@ func RunServer(cnf Config) {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	srv := InitServer(cnf.Listen, collect, cnf.Debug, cnf.LogQueries)
+	if cnf.MaxBodySize != "" {
+		srv.SetBodyLimit(cnf.MaxBodySize)
+	}
 
 	go func() {
 		<-signals

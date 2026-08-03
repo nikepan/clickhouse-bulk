@@ -32,6 +32,7 @@ type Config struct {
 	Debug             bool             `json:"debug"`
 	LogQueries        bool             `json:"log_queries"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
+	MaxBodySize       string           `json:"max_body_size"`
 	UseTLS            bool             `json:"use_tls"`
 	TLSCertFile       string           `json:"tls_cert_file"`
 	TLSKeyFile        string           `json:"tls_key_file"`
@@ -138,6 +139,7 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvString("CLICKHOUSE_TLS_SERVER_NAME", &cnf.Clickhouse.TLSServerName)
 	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.TLSSkipVerify)
 	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
+	readEnvString("CLICKHOUSE_MAX_BODY_SIZE", &cnf.MaxBodySize)
 	readEnvBool("LOG_QUERIES", &cnf.LogQueries)
 
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")

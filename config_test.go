@@ -19,6 +19,7 @@ func TestReadConfig(t *testing.T) {
 	assert.True(t, cnf.RemoveQueryID)
 	assert.Equal(t, []string{"http://127.0.0.1:8123"}, cnf.Clickhouse.Servers)
 	assert.Equal(t, 60, cnf.Clickhouse.SendTimeout)
+	assert.Equal(t, "", cnf.MaxBodySize)
 }
 
 func TestDefaultValues(t *testing.T) {
