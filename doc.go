@@ -1,11 +1,9 @@
 /*
-
 ClickHouse-Bulk
 
 Simple Yandex ClickHouse (https://clickhouse.yandex/) insert collector. It collect requests and send to ClickHouse servers.
 
-
-Features
+# Features
 
 - Group n requests and send to any of ClickHouse server
 
@@ -21,7 +19,6 @@ Features
 
 - - Supports basic authentication
 
-
 For example:
 
 INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')
@@ -32,39 +29,34 @@ sends as
 
 INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 
-
-Options
+# Options
 
 - -config - config file (json); default _config.json_
 
+# Configuration file
 
-Configuration file
+	{
+	  "listen": ":8124",
+	  "flush_count": 10000, // check by \n char
+	  "flush_interval": 1000, // milliseconds
+	  "debug": false, // log incoming requests
+	  "log_queries": true, // log "Sending/sent x rows to" messages for each query
+	  "dump_dir": "dumps", // directory for dump unsended data (if clickhouse errors)
+	  "clickhouse": {
+	    "down_timeout": 300, // wait if server in down (seconds)
+	    "servers": [
+	      "http://127.0.0.1:8123"
+	    ]
+	  }
+	}
 
-{
-  "listen": ":8124",
-  "flush_count": 10000, // check by \n char
-  "flush_interval": 1000, // milliseconds
-  "debug": false, // log incoming requests
-  "log_queries": true, // log "Sending/sent x rows to" messages for each query
-  "dump_dir": "dumps", // directory for dump unsended data (if clickhouse errors)
-  "clickhouse": {
-    "down_timeout": 300, // wait if server in down (seconds)
-    "servers": [
-      "http://127.0.0.1:8123"
-    ]
-  }
-}
-
-
-Quickstart
+# Quickstart
 
 `./clickhouse-bulk`
 and send queries to :8124
 
-
-Tips
+# Tips
 
 For better performance words FORMAT and VALUES must be uppercase.
-
 */
 package main
