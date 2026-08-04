@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +18,7 @@ import (
 	"runtime/debug"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -55,10 +58,11 @@ func (server *Server) writeHandler(c echo.Context) error {
 	qs := c.QueryString()
 	user, password, ok := c.Request().BasicAuth()
 	if ok {
+		auth := "user=" + url.QueryEscape(user) + "&password=" + url.QueryEscape(password)
 		if qs == "" {
-			qs = "user=" + user + "&password=" + password
+			qs = auth
 		} else {
-			qs = "user=" + user + "&password=" + password + "&" + qs
+			qs = auth + "&" + qs
 		}
 	}
 	params, content, insert := server.Collector.ParseQuery(qs, s)
@@ -67,7 +71,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 			log.Printf("INFO: empty insert params: [%+v] content: [%+v]\n", params, content)
 			return c.String(http.StatusInternalServerError, "Empty insert\n")
 		}
-		go server.Collector.Push(params, content)
+		server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
 	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, isInsert: false})
@@ -90,16 +94,13 @@ func (server *Server) freeMemHandler(c echo.Context) error {
 
 // manual trigger for cleaning tables
 func (server *Server) tablesCleanHandler(c echo.Context) error {
-	log.Printf("DEBUG: clean tables:\n%+v", server.Collector.Tables)
-	for k, t := range server.Collector.Tables {
-		log.Printf("DEBUG: check if table is empty: %+v with key:%+v\n", t, k)
-		if ok := t.Empty(); ok {
-			log.Printf("DEBUG: delete empty table: %+v with key:%+v\n", t, k)
-			server.Collector.Tables[k].CleanTable()
-			defer delete(server.Collector.Tables, k)
-		}
-	}
+	server.Collector.CleanEmptyTables()
 	return c.JSON(200, Status{Status: "cleaned empty tables"})
+}
+
+// SetBodyLimit - reject requests with body larger than limit (echo format, e.g. "100M")
+func (server *Server) SetBodyLimit(limit string) {
+	server.echo.Use(middleware.BodyLimit(limit))
 }
 
 // Start - start http server
@@ -122,11 +123,14 @@ func InitServer(listen string, collector *Collector, debug bool, logQueries bool
 	server.echo.POST("/", server.writeHandler)
 	server.echo.GET("/status", server.statusHandler)
 	server.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
-	// debug stuff
-	server.echo.GET("/debug/gc", server.gcHandler)
-	server.echo.GET("/debug/freemem", server.freeMemHandler)
-	server.echo.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
-	server.echo.GET("/debug/tables-clean", server.tablesCleanHandler)
+	if debug {
+		// debug endpoints expose internals and have no auth,
+		// keep them off unless debug mode is enabled explicitly
+		server.echo.GET("/debug/gc", server.gcHandler)
+		server.echo.GET("/debug/freemem", server.freeMemHandler)
+		server.echo.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+		server.echo.GET("/debug/tables-clean", server.tablesCleanHandler)
+	}
 
 	return server
 }
@@ -137,9 +141,6 @@ func SafeQuit(collect *Collector, sender Sender) {
 	if count := sender.Len(); count > 0 {
 		log.Printf("Sending %+v tables\n", count)
 	}
-	for !sender.Empty() && !collect.Empty() {
-		collect.WaitFlush()
-	}
 	collect.WaitFlush()
 }
 
@@ -147,7 +148,7 @@ func SafeQuit(collect *Collector, sender Sender) {
 func RunServer(cnf Config) {
 	InitMetrics(cnf.MetricsPrefix)
 	dumper := NewDumper(cnf.DumpDir)
-	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.TLSServerName, cnf.Clickhouse.TLSSkipVerify)
+	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.SendTimeout, cnf.Clickhouse.TLSServerName, cnf.Clickhouse.TLSSkipVerify)
 	sender.Dumper = dumper
 	for _, url := range cnf.Clickhouse.Servers {
 		sender.AddServer(url, cnf.LogQueries)
@@ -156,22 +157,23 @@ func RunServer(cnf Config) {
 	collect := NewCollector(sender, cnf.FlushCount, cnf.FlushInterval, cnf.CleanInterval, cnf.RemoveQueryID)
 
 	// send collected data on SIGTERM and exit
-	signals := make(chan os.Signal)
+	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	srv := InitServer(cnf.Listen, collect, cnf.Debug, cnf.LogQueries)
+	if cnf.MaxBodySize != "" {
+		srv.SetBodyLimit(cnf.MaxBodySize)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	go func() {
-		for {
-			_ = <-signals
-			log.Printf("STOP signal\n")
-			if err := srv.Shutdown(ctx); err != nil {
-				log.Printf("Shutdown error %+v\n", err)
-				SafeQuit(collect, sender)
-				os.Exit(1)
-			}
+		<-signals
+		log.Printf("STOP signal\n")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Shutdown error %+v\n", err)
+			SafeQuit(collect, sender)
+			os.Exit(1)
 		}
 	}()
 
@@ -182,6 +184,11 @@ func RunServer(cnf Config) {
 	log.Printf("Server starting on %s\n", cnf.Listen)
 	err := srv.Start(cnf)
 	if err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Server stopped\n")
+			SafeQuit(collect, sender)
+			return
+		}
 		log.Printf("ListenAndServe: %+v\n", err)
 		SafeQuit(collect, sender)
 		os.Exit(1)

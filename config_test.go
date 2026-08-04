@@ -18,6 +18,8 @@ func TestReadConfig(t *testing.T) {
 	assert.Equal(t, 300, cnf.DumpCheckInterval)
 	assert.True(t, cnf.RemoveQueryID)
 	assert.Equal(t, []string{"http://127.0.0.1:8123"}, cnf.Clickhouse.Servers)
+	assert.Equal(t, 60, cnf.Clickhouse.SendTimeout)
+	assert.Equal(t, "", cnf.MaxBodySize)
 }
 
 func TestDefaultValues(t *testing.T) {
@@ -55,6 +57,17 @@ func TestEnvOverrides(t *testing.T) {
 	// Verify overrides
 	assert.Equal(t, 5000, cnf.FlushCount)
 	assert.True(t, cnf.Debug)
+}
+
+func TestEnvOverrideInvalidInt(t *testing.T) {
+	os.Setenv("CLICKHOUSE_FLUSH_COUNT", "notanumber")
+	defer os.Unsetenv("CLICKHOUSE_FLUSH_COUNT")
+
+	cnf, err := ReadConfig("non_existent_config.json")
+	assert.Nil(t, err)
+
+	// invalid env value must not override the default with zero
+	assert.Equal(t, 10000, cnf.FlushCount)
 }
 
 func TestConfigFileStructure(t *testing.T) {

@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -106,7 +108,7 @@ func TestServer_MultiServer(t *testing.T) {
 	}))
 	defer s2.Close()
 
-	sender := NewClickhouse(10, 10, "", false)
+	sender := NewClickhouse(10, 10, 0, "", false)
 	sender.AddServer(s1.URL, true)
 	sender.AddServer(s2.URL, true)
 	collect := NewCollector(sender, 1000, 1000, 0, true)
@@ -118,19 +120,83 @@ func TestServer_MultiServer(t *testing.T) {
 	assert.False(t, collect.Empty())
 
 	SafeQuit(collect, sender)
-	time.Sleep(100) // wait for http servers process requests
+	time.Sleep(100 * time.Millisecond) // wait for http servers process requests
 
 	assert.Equal(t, 3, len(received))
 	assert.True(t, collect.Empty())
 	assert.True(t, sender.Empty())
+}
 
-	os.Setenv("DUMP_CHECK_INTERVAL", "10")
-	cnf, err := ReadConfig("wrong_config.json")
-	os.Unsetenv("DUMP_CHECK_INTERVAL")
-	assert.Nil(t, err)
-	assert.Equal(t, 10, cnf.DumpCheckInterval)
-	go RunServer(cnf)
-	time.Sleep(1000)
+func TestServer_TablesCleanHandlerConcurrent(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, true, false)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 500; i++ {
+			collector.Push(fmt.Sprintf("query=%d", i), "data")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			status, _ := request("GET", "/debug/tables-clean", "", server.echo)
+			assert.Equal(t, http.StatusOK, status)
+		}
+	}()
+	wg.Wait()
+}
+
+func TestServer_DebugEndpointsRequireDebugMode(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	for _, p := range []string{"/debug/gc", "/debug/freemem", "/debug/pprof/", "/debug/tables-clean"} {
+		status, _ := request("GET", p, "", server.echo)
+		assert.Equal(t, http.StatusNotFound, status, p)
+	}
+
+	debugCollector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	debugServer := InitServer("", debugCollector, true, false)
+	for _, p := range []string{"/debug/gc", "/debug/freemem", "/debug/tables-clean"} {
+		status, _ := request("GET", p, "", debugServer.echo)
+		assert.Equal(t, http.StatusOK, status, p)
+	}
+}
+
+func TestServer_BasicAuthEscaped(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	status, _ := authRequest("POST", "user&1", "p&ss=w@rd", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Len(t, collector.Tables, 1)
+	for k := range collector.Tables {
+		assert.Contains(t, k, "user="+url.QueryEscape("user&1"))
+		assert.Contains(t, k, "password="+url.QueryEscape("p&ss=w@rd"))
+	}
+}
+
+func TestServer_BodyLimit(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	server.SetBodyLimit("1K")
+	big := strings.Repeat("a", 2048)
+	status, _ := request("POST", "/?query="+escTitle, big, server.echo)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, status)
+
+	status, _ = request("POST", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+}
+
+func TestServer_WriteHandlerStoresBeforeResponding(t *testing.T) {
+	sender := &fakeSender{}
+	collector := NewCollector(sender, 1, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	status, _ := request("POST", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	sender.mu.Lock()
+	defer sender.mu.Unlock()
+	assert.Len(t, sender.sendHistory, 1)
 }
 
 func request(method, path string, body string, e *echo.Echo) (int, string) {
@@ -146,4 +212,48 @@ func authRequest(method, user string, password string, path string, body string,
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.String()
+}
+
+// keep this test last in the package: RunServer leaks its goroutines,
+// so nothing that touches shared globals may run after it
+func TestZRunServerSmoke(t *testing.T) {
+	os.Setenv("DUMP_CHECK_INTERVAL", "10")
+	cnf, err := ReadConfig("wrong_config.json")
+	os.Unsetenv("DUMP_CHECK_INTERVAL")
+	assert.Nil(t, err)
+	assert.Equal(t, 10, cnf.DumpCheckInterval)
+	go RunServer(cnf)
+	time.Sleep(time.Second)
+}
+
+func TestZRunServerGracefulShutdown(t *testing.T) {
+	cnf, err := ReadConfig("wrong_config.json")
+	assert.Nil(t, err)
+	cnf.Listen = "127.0.0.1:18124"
+	cnf.DumpCheckInterval = -1
+	go RunServer(cnf)
+
+	up := false
+	for i := 0; i < 100; i++ {
+		if _, err := http.Get("http://127.0.0.1:18124/status"); err == nil {
+			up = true
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	assert.True(t, up, "server did not start")
+
+	// the shutdown context must not be created at startup: wait until a
+	// startup-time 5s context would already be expired
+	time.Sleep(6 * time.Second)
+	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := http.Get("http://127.0.0.1:18124/status"); err != nil {
+			return // server stopped accepting, process still alive
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("server still accepting connections after SIGTERM")
 }

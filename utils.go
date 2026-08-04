@@ -16,6 +16,7 @@ type clickhouseConfig struct {
 	TLSSkipVerify  bool     `json:"insecure_tls_skip_verify"`
 	DownTimeout    int      `json:"down_timeout"`
 	ConnectTimeout int      `json:"connect_timeout"`
+	SendTimeout    int      `json:"send_timeout"`
 }
 
 // Config stores config data
@@ -31,6 +32,7 @@ type Config struct {
 	Debug             bool             `json:"debug"`
 	LogQueries        bool             `json:"log_queries"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
+	MaxBodySize       string           `json:"max_body_size"`
 	UseTLS            bool             `json:"use_tls"`
 	TLSCertFile       string           `json:"tls_cert_file"`
 	TLSKeyFile        string           `json:"tls_key_file"`
@@ -54,6 +56,7 @@ func defaultConfig() Config {
 		Clickhouse: clickhouseConfig{
 			DownTimeout:    60,
 			ConnectTimeout: 10,
+			SendTimeout:    60,
 			TLSServerName:  "",
 			TLSSkipVerify:  false,
 			Servers:        []string{"http://127.0.0.1:8123"},
@@ -64,10 +67,10 @@ func defaultConfig() Config {
 // ReadJSON - read json file to struct
 func ReadJSON(fn string, v interface{}) error {
 	file, err := os.Open(fn)
-	defer file.Close()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	decoder := json.NewDecoder(file)
 	return decoder.Decode(v)
 }
@@ -83,21 +86,22 @@ func readEnvInt(name string, value *int) {
 		v, err := strconv.Atoi(s)
 		if err != nil {
 			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		} else {
+			*value = v
 		}
-		*value = v
 	}
 }
 
 func readEnvBool(name string, value *bool) {
-    s := os.Getenv(name)
-    if s != "" {
-        v, err := strconv.ParseBool(s)
-        if err != nil {
-            log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
-        } else {
-            *value = v
-        }
-    }
+	s := os.Getenv(name)
+	if s != "" {
+		v, err := strconv.ParseBool(s)
+		if err != nil {
+			log.Printf("ERROR: Wrong %+v env: %+v\n", name, err)
+		} else {
+			*value = v
+		}
+	}
 }
 
 func readEnvString(name string, value *string) {
@@ -106,7 +110,6 @@ func readEnvString(name string, value *string) {
 		*value = s
 	}
 }
-
 
 // ReadConfig init config data
 func ReadConfig(configFile string) (Config, error) {
@@ -132,9 +135,11 @@ func ReadConfig(configFile string) (Config, error) {
 	readEnvInt("DUMP_CHECK_INTERVAL", &cnf.DumpCheckInterval)
 	readEnvInt("CLICKHOUSE_DOWN_TIMEOUT", &cnf.Clickhouse.DownTimeout)
 	readEnvInt("CLICKHOUSE_CONNECT_TIMEOUT", &cnf.Clickhouse.ConnectTimeout)
+	readEnvInt("CLICKHOUSE_SEND_TIMEOUT", &cnf.Clickhouse.SendTimeout)
 	readEnvString("CLICKHOUSE_TLS_SERVER_NAME", &cnf.Clickhouse.TLSServerName)
 	readEnvBool("CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY", &cnf.Clickhouse.TLSSkipVerify)
 	readEnvString("METRICS_PREFIX", &cnf.MetricsPrefix)
+	readEnvString("CLICKHOUSE_MAX_BODY_SIZE", &cnf.MaxBodySize)
 	readEnvBool("LOG_QUERIES", &cnf.LogQueries)
 
 	serversList := os.Getenv("CLICKHOUSE_SERVERS")

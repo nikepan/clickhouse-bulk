@@ -149,11 +149,17 @@ func (t *Table) Add(text string) {
 	t.lastUpdate = time.Now()
 }
 
-// CleanTable - delete table from map
+// CleanTable - stop table timer and flush pending rows
 func (t *Table) CleanTable() {
 	t.mu.Lock()
-	close(*t.TickerChan)
-	t = nil
+	if t.count > 0 {
+		t.Flush()
+	}
+	t.mu.Unlock()
+	if t.TickerChan != nil {
+		close(*t.TickerChan)
+		t.TickerChan = nil
+	}
 }
 
 // CleanTables - clean unsused tables
@@ -164,9 +170,20 @@ func (c *Collector) CleanTables() {
 		if t.lastUpdate.Add(time.Duration(c.CleanInterval) * time.Millisecond).Before(time.Now()) {
 			// table was not updated for CleanInterval - delete that table - otherwise it can cause memLeak
 			t.CleanTable()
-			defer delete(c.Tables, k)
+			delete(c.Tables, k)
 		}
+	}
+}
 
+// CleanEmptyTables - delete tables with no pending rows
+func (c *Collector) CleanEmptyTables() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k, t := range c.Tables {
+		if t.Empty() {
+			t.CleanTable()
+			delete(c.Tables, k)
+		}
 	}
 }
 

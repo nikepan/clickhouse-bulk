@@ -10,8 +10,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestClickhouse_Timeouts(t *testing.T) {
+	c := NewClickhouse(300, 3, 45, "", false)
+	c.AddServer("http://example.com", false)
+	// send_timeout limits the whole request, not just connection setup:
+	// a big batch insert must not be killed by the short connect timeout
+	assert.Equal(t, 45*time.Second, c.Servers[0].Client.Timeout)
+
+	def := NewClickhouse(300, 3, 0, "", false)
+	def.AddServer("http://example.com", false)
+	assert.Equal(t, 60*time.Second, def.Servers[0].Client.Timeout)
+}
+
 func TestClickhouse_GetNextServer(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, 0, "", false)
 	c.AddServer("", true)
 	c.AddServer("http://127.0.0.1:8124", true)
 	c.AddServer("http://127.0.0.1:8125", true)
@@ -30,7 +42,7 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 }
 
 func TestClickhouse_Send(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, 0, "", false)
 	c.AddServer("", true)
 	c.Send(&ClickhouseRequest{})
 	for !c.Queue.Empty() {
@@ -39,7 +51,7 @@ func TestClickhouse_Send(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery(t *testing.T) {
-	c := NewClickhouse(300, 10, "", false)
+	c := NewClickhouse(300, 10, 0, "", false)
 	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].Bad = true
@@ -49,7 +61,7 @@ func TestClickhouse_SendQuery(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery1(t *testing.T) {
-	c := NewClickhouse(-1, 10, "", false)
+	c := NewClickhouse(-1, 10, 0, "", false)
 	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].Bad = true
@@ -60,8 +72,8 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 func TestClickhouse_ResponseBodyClosed(t *testing.T) {
 	var closed bool
 	body := &spyBody{onClose: func() { closed = true }}
-	
-	c := NewClickhouse(300, 10, "", false)
+
+	c := NewClickhouse(300, 10, 0, "", false)
 	c.AddServer("http://example.com", false)
 	srv := c.GetNextServer()
 	srv.Client = &http.Client{
@@ -73,10 +85,12 @@ func TestClickhouse_ResponseBodyClosed(t *testing.T) {
 }
 
 type spyTransport struct{ body *spyBody }
+
 func (t *spyTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: 200, Body: t.body}, nil
 }
 
 type spyBody struct{ onClose func() }
+
 func (b *spyBody) Read(p []byte) (int, error) { copy(p, "OK"); return 2, io.EOF }
-func (b *spyBody) Close() error { b.onClose(); return nil }
+func (b *spyBody) Close() error               { b.onClose(); return nil }

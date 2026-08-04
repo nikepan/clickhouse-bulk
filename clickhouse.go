@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ type Clickhouse struct {
 	mu             sync.Mutex
 	DownTimeout    int
 	ConnectTimeout int
+	SendTimeout    int
 	Dumper         Dumper
 	wg             sync.WaitGroup
 	Transport      *http.Transport
@@ -51,7 +53,7 @@ var ErrServerIsDown = errors.New("server is down")
 var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
-func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
+func NewClickhouse(downTimeout int, connectTimeout int, sendTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -68,10 +70,17 @@ func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tl
 	if c.ConnectTimeout <= 0 {
 		c.ConnectTimeout = 10
 	}
+	c.SendTimeout = sendTimeout
+	if c.SendTimeout <= 0 {
+		c.SendTimeout = 60
+	}
 	c.Servers = make([]*ClickhouseServer, 0)
 	c.Queue = queue.New(1000)
 	c.Transport = &http.Transport{
 		TLSClientConfig: tlsConfig,
+		DialContext: (&net.Dialer{
+			Timeout: time.Second * time.Duration(c.ConnectTimeout),
+		}).DialContext,
 	}
 	go c.Run()
 	return c
@@ -82,8 +91,8 @@ func (c *Clickhouse) AddServer(url string, logQueries bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
-		Timeout: time.Second * time.Duration(c.ConnectTimeout), Transport: c.Transport,
-	}, LogQueries: logQueries })
+		Timeout: time.Second * time.Duration(c.SendTimeout), Transport: c.Transport,
+	}, LogQueries: logQueries})
 }
 
 // DumpServers - dump servers state to prometheus
