@@ -202,6 +202,80 @@ func TestServer_DebugQueryDoesNotLogCredentials(t *testing.T) {
 	assert.NotContains(t, out, "secretpass")
 }
 
+func TestServer_ClickHouseUserHeader(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	status, _ := chAuthRequest("POST", "user&1", "p&ss=w@rd", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Len(t, collector.Tables, 1)
+	for k := range collector.Tables {
+		assert.Contains(t, k, "user="+url.QueryEscape("user&1"))
+		assert.Contains(t, k, "password="+url.QueryEscape("p&ss=w@rd"))
+	}
+}
+
+func TestServer_ClickHouseUserHeaderWithoutKey(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	// key is optional: clickhouse allows users without a password
+	status, _ := chAuthRequest("POST", "nopass", "", "/?query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Len(t, collector.Tables, 1)
+	for k := range collector.Tables {
+		assert.Contains(t, k, "user=nopass")
+		assert.Contains(t, k, "password=")
+	}
+}
+
+func TestServer_BasicAuthWinsOverClickHouseHeaders(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+
+	req := httptest.NewRequest("POST", "/?query="+escTitle, strings.NewReader(qContent))
+	req.SetBasicAuth("basicuser", "basicpass")
+	req.Header.Set("X-ClickHouse-User", "headeruser")
+	req.Header.Set("X-ClickHouse-Key", "headerpass")
+	rec := httptest.NewRecorder()
+	server.echo.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Len(t, collector.Tables, 1)
+	for k := range collector.Tables {
+		assert.Contains(t, k, "user=basicuser")
+		assert.NotContains(t, k, "headeruser")
+		assert.Equal(t, 1, strings.Count(k, "user="))
+	}
+}
+
+func TestServer_ClickHouseUserHeaderKeepsQueryParams(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+	// credentials already in the query string must not get a second user=
+	status, _ := chAuthRequest("POST", "headeruser", "headerpass", "/?user=paramuser&password=parampass&query="+escTitle, qContent, server.echo)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Len(t, collector.Tables, 1)
+	for k := range collector.Tables {
+		assert.Contains(t, k, "user=paramuser")
+		assert.NotContains(t, k, "headeruser")
+		assert.Equal(t, 1, strings.Count(k, "user="))
+	}
+}
+
+func TestServer_ClickHouseHeaderCredentialsNotLogged(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+
+	// credentials taken from headers end up in params like basic auth ones,
+	// so they must be redacted in the log the same way
+	out := captureLog(func() {
+		status, _ := chAuthRequest("POST", "headeruser", "secretpass", "/?query="+escTitle, "", server.echo)
+		assert.Equal(t, http.StatusInternalServerError, status)
+	})
+
+	assert.Contains(t, out, "empty insert")
+	assert.NotContains(t, out, "secretpass")
+}
+
 func TestServer_BodyLimit(t *testing.T) {
 	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	server := InitServer("", collector, false, false)
@@ -235,6 +309,19 @@ func request(method, path string, body string, e *echo.Echo) (int, string) {
 func authRequest(method, user string, password string, path string, body string, e *echo.Echo) (int, string) {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.SetBasicAuth(user, password)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec.Code, rec.Body.String()
+}
+
+func chAuthRequest(method, user string, key string, path string, body string, e *echo.Echo) (int, string) {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	if user != "" {
+		req.Header.Set("X-ClickHouse-User", user)
+	}
+	if key != "" {
+		req.Header.Set("X-ClickHouse-Key", key)
+	}
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.String()
