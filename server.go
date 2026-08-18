@@ -22,6 +22,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// auth headers of the clickhouse http interface
+const headerUser = "X-ClickHouse-User"
+const headerKey = "X-ClickHouse-Key"
+
 // Server - main server object
 type Server struct {
 	Listen     string
@@ -47,6 +51,22 @@ func NewServer(listen string, collector *Collector, debug bool, logQueries bool)
 	return &Server{listen, collector, debug, logQueries, e}
 }
 
+// requestCredentials - get credentials of the incoming request: basic auth
+// first, X-ClickHouse-User/X-ClickHouse-Key headers after it. Credentials
+// already passed in the query string are left alone, sending a second user
+// to clickhouse would only make the request ambiguous.
+func requestCredentials(r *http.Request, query string) (user string, password string, ok bool) {
+	if user, password, ok = r.BasicAuth(); ok {
+		return user, password, true
+	}
+	user = r.Header.Get(headerUser)
+	if user == "" || HasQueryParam(query, "user") {
+		return "", "", false
+	}
+	// key is optional: a user may have an empty password
+	return user, r.Header.Get(headerKey), true
+}
+
 func (server *Server) writeHandler(c echo.Context) error {
 	q, _ := io.ReadAll(c.Request().Body)
 	s := string(q)
@@ -56,7 +76,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 	}
 
 	qs := c.QueryString()
-	user, password, ok := c.Request().BasicAuth()
+	user, password, ok := requestCredentials(c.Request(), qs)
 	if ok {
 		auth := "user=" + url.QueryEscape(user) + "&password=" + url.QueryEscape(password)
 		if qs == "" {

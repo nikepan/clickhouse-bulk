@@ -133,6 +133,15 @@ func TestReadConfigDoesNotLogCredentials(t *testing.T) {
 	assert.NotContains(t, out, "secretpass")
 }
 
+func TestHasQueryParam(t *testing.T) {
+	assert.True(t, HasQueryParam("database=db&user=default&query=SELECT+1", "user"))
+	assert.True(t, HasQueryParam("user=default", "user"))
+	// a longer name must not count as a match
+	assert.False(t, HasQueryParam("username=default", "user"))
+	assert.False(t, HasQueryParam("query=SELECT+1", "user"))
+	assert.False(t, HasQueryParam("", "user"))
+}
+
 func TestTLSConfig(t *testing.T) {
 	// Create a temporary config file with TLS settings
 	configContent := `{

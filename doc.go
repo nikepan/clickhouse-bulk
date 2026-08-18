@@ -19,6 +19,8 @@ Simple Yandex ClickHouse (https://clickhouse.yandex/) insert collector. It colle
 
 - - Supports basic authentication
 
+- - Supports X-ClickHouse-User and X-ClickHouse-Key headers
+
 For example:
 
 INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')

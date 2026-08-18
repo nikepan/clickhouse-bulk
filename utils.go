@@ -111,6 +111,16 @@ func RedactQuery(query string) string {
 	return strings.Join(items, "&")
 }
 
+// HasQueryParam tests whether the query string already contains the parameter.
+func HasQueryParam(query string, name string) bool {
+	for _, p := range strings.Split(query, "&") {
+		if HasPrefix(p, name+"=") {
+			return true
+		}
+	}
+	return false
+}
+
 func readEnvInt(name string, value *int) {
 	s := os.Getenv(name)
 	if s != "" {

@@ -35,6 +35,7 @@ go build
 - Supports query in query parameters and in body
 - Supports other query parameters like username, password, database
 - Supports basic authentication
+- Supports X-ClickHouse-User and X-ClickHouse-Key headers
 
 
 For example:
