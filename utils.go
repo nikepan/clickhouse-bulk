@@ -3,12 +3,16 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 )
 
 const sampleConfig = "config.sample.json"
+
+// same placeholder as url.URL.Redacted uses for hidden passwords
+const redactedValue = "xxxxx"
 
 type clickhouseConfig struct {
 	Servers        []string `json:"servers"`
@@ -80,6 +84,33 @@ func HasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.ToLower(s[0:len(prefix)]) == strings.ToLower(prefix)
 }
 
+// RedactURL - hide password in url, for safe logging
+func RedactURL(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil {
+		return u.Redacted()
+	}
+	// unparsable url may still contain credentials, cut everything before @
+	i := strings.LastIndex(rawURL, "@")
+	if i < 0 {
+		return rawURL
+	}
+	if j := strings.Index(rawURL, "//"); j >= 0 {
+		return rawURL[:j+2] + redactedValue + rawURL[i:]
+	}
+	return redactedValue + rawURL[i:]
+}
+
+// RedactQuery - hide password parameter in query string, for safe logging
+func RedactQuery(query string) string {
+	items := strings.Split(query, "&")
+	for i, p := range items {
+		if HasPrefix(p, "password=") {
+			items[i] = "password=" + redactedValue
+		}
+	}
+	return strings.Join(items, "&")
+}
+
 func readEnvInt(name string, value *int) {
 	s := os.Getenv(name)
 	if s != "" {
@@ -147,6 +178,11 @@ func ReadConfig(configFile string) (Config, error) {
 		cnf.Clickhouse.Servers = strings.Split(serversList, ",")
 	}
 
-	log.Printf("Using servers: %+v", strings.Join(cnf.Clickhouse.Servers, ", "))
+	// servers may contain basic auth credentials, keep them out of the log
+	redacted := make([]string, 0, len(cnf.Clickhouse.Servers))
+	for _, s := range cnf.Clickhouse.Servers {
+		redacted = append(redacted, RedactURL(s))
+	}
+	log.Printf("Using servers: %+v", strings.Join(redacted, ", "))
 	return cnf, nil
 }

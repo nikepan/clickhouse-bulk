@@ -204,7 +204,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 			url += "?" + r.Params
 		}
 		if r.isInsert && srv.LogQueries {
-			log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+			log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, RedactURL(srv.URL), r.Query)
 		}
 		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
 		if err != nil {
@@ -213,7 +213,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		}
 		defer resp.Body.Close()
 		if r.isInsert && srv.LogQueries {
-			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
+			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, RedactURL(srv.URL), r.Query)
 		}
 		buf, _ := io.ReadAll(resp.Body)
 		s := string(buf)

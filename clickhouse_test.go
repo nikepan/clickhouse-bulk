@@ -84,6 +84,20 @@ func TestClickhouse_ResponseBodyClosed(t *testing.T) {
 	assert.True(t, closed)
 }
 
+func TestClickhouse_SendQueryDoesNotLogCredentials(t *testing.T) {
+	c := NewClickhouse(300, 10, 0, "", false)
+	c.AddServer("http://user:secretpass@127.0.0.1:8123", true)
+	srv := c.GetNextServer()
+	srv.Client = &http.Client{Transport: &spyTransport{body: &spyBody{onClose: func() {}}}}
+
+	out := captureLog(func() {
+		srv.SendQuery(&ClickhouseRequest{Query: "INSERT INTO t VALUES", Content: "(1)", Count: 1, isInsert: true})
+	})
+
+	assert.Contains(t, out, "127.0.0.1:8123")
+	assert.NotContains(t, out, "secretpass")
+}
+
 type spyTransport struct{ body *spyBody }
 
 func (t *spyTransport) RoundTrip(*http.Request) (*http.Response, error) {

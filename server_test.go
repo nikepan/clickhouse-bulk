@@ -176,6 +176,32 @@ func TestServer_BasicAuthEscaped(t *testing.T) {
 	}
 }
 
+func TestServer_EmptyInsertDoesNotLogCredentials(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, false, false)
+
+	out := captureLog(func() {
+		status, _ := authRequest("POST", "default", "secretpass", "/?query="+escTitle, "", server.echo)
+		assert.Equal(t, http.StatusInternalServerError, status)
+	})
+
+	assert.Contains(t, out, "empty insert")
+	assert.NotContains(t, out, "secretpass")
+}
+
+func TestServer_DebugQueryDoesNotLogCredentials(t *testing.T) {
+	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
+	server := InitServer("", collector, true, false)
+
+	out := captureLog(func() {
+		status, _ := request("POST", "/?password=secretpass&query="+escTitle, qContent, server.echo)
+		assert.Equal(t, http.StatusOK, status)
+	})
+
+	assert.Contains(t, out, "DEBUG: query")
+	assert.NotContains(t, out, "secretpass")
+}
+
 func TestServer_BodyLimit(t *testing.T) {
 	collector := NewCollector(&fakeSender{}, 1000, 1000, 0, true)
 	server := InitServer("", collector, false, false)
