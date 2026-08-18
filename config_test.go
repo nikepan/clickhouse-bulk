@@ -1,11 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// captureLog - collects everything written to the standard logger in fn
+func captureLog(fn func()) string {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	fn()
+	return buf.String()
+}
 
 func TestReadConfig(t *testing.T) {
 	// Test with a non-existent file (should use defaults)
@@ -84,6 +95,42 @@ func TestConfigFileStructure(t *testing.T) {
 	assert.NotEmpty(t, cnf.Listen)
 	assert.Greater(t, cnf.FlushCount, 0)
 	assert.Greater(t, len(cnf.Clickhouse.Servers), 0)
+}
+
+func TestRedactURL(t *testing.T) {
+	assert.Equal(t, "http://user:xxxxx@127.0.0.1:8123", RedactURL("http://user:secretpass@127.0.0.1:8123"))
+	assert.Equal(t, "http://127.0.0.1:8123", RedactURL("http://127.0.0.1:8123"))
+	assert.Equal(t, "", RedactURL(""))
+	// an unparsable url may still hold credentials, they must not pass through
+	assert.NotContains(t, RedactURL("http://user:secret pass@127.0.0.1:8123"), "secret")
+}
+
+func TestRedactQuery(t *testing.T) {
+	assert.Equal(t, "user=default&password=xxxxx&query=SELECT+1", RedactQuery("user=default&password=secretpass&query=SELECT+1"))
+	assert.Equal(t, "password=xxxxx", RedactQuery("password=secretpass"))
+	assert.Equal(t, "query=SELECT+1", RedactQuery("query=SELECT+1"))
+	assert.Equal(t, "", RedactQuery(""))
+}
+
+func TestReadConfigDoesNotLogCredentials(t *testing.T) {
+	configContent := `{"clickhouse": {"servers": ["http://user:secretpass@127.0.0.1:8123"]}}`
+	tmpFile, err := os.CreateTemp("", "test_creds_config_*.json")
+	assert.Nil(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(configContent)
+	assert.Nil(t, err)
+	tmpFile.Close()
+
+	out := captureLog(func() {
+		cnf, err := ReadConfig(tmpFile.Name())
+		assert.Nil(t, err)
+		// the config itself must keep the credentials, only the log is redacted
+		assert.Equal(t, []string{"http://user:secretpass@127.0.0.1:8123"}, cnf.Clickhouse.Servers)
+	})
+
+	assert.Contains(t, out, "127.0.0.1:8123")
+	assert.NotContains(t, out, "secretpass")
 }
 
 func TestTLSConfig(t *testing.T) {
