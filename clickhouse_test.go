@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -63,12 +64,57 @@ func TestClickhouse_SendQuery(t *testing.T) {
 }
 
 func TestClickhouse_SendQuery1(t *testing.T) {
-	c := NewClickhouse(-1, 10, 0, "", false)
+	c := NewClickhouse(60, 10, 0, "", false)
 	c.AddServer("", true)
 	c.GetNextServer()
 	c.Servers[0].SetBad(true)
+	// still inside down_timeout: server stays out of rotation
+	assert.Nil(t, c.GetNextServer())
+	// down_timeout elapsed: server is given another chance
+	c.Servers[0].LastRequest = time.Now().Add(-61 * time.Second)
 	s := c.GetNextServer()
+	assert.NotNil(t, s)
 	assert.Equal(t, false, s.IsBad())
+}
+
+// a down_timeout of 0 would unban a dead server instantly and turn the retry
+// loop into an endless hot cycle, so it falls back to the default like the
+// other timeouts do
+func TestClickhouse_DownTimeoutDefaults(t *testing.T) {
+	assert.Equal(t, 60, NewClickhouse(0, 10, 10, "", false).DownTimeout)
+	assert.Equal(t, 60, NewClickhouse(-1, 10, 10, "", false).DownTimeout)
+	assert.Equal(t, 300, NewClickhouse(300, 10, 10, "", false).DownTimeout)
+}
+
+// the retry loop must end after trying every server once, without relying on
+// down_timeout to keep dead servers out of rotation
+func TestClickhouse_SendQueryStopsAfterOneRoundOfServers(t *testing.T) {
+	var hits int64
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		time.Sleep(50 * time.Millisecond)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer down.Close()
+
+	// down_timeout deliberately shorter than a full cycle over the servers
+	c := NewClickhouse(1, 10, 10, "", false)
+	for i := 0; i < 4; i++ {
+		c.AddServer(down.URL, false)
+	}
+
+	done := make(chan int, 1)
+	go func() {
+		_, status, _ := c.SendQuery(&ClickhouseRequest{Content: "test"})
+		done <- status
+	}()
+	select {
+	case status := <-done:
+		assert.Equal(t, http.StatusServiceUnavailable, status)
+		assert.Equal(t, int64(4), atomic.LoadInt64(&hits))
+	case <-time.After(5 * time.Second):
+		t.Fatalf("SendQuery did not give up, %+v requests sent to dead servers", atomic.LoadInt64(&hits))
+	}
 }
 
 func TestClickhouse_ResponseBodyClosed(t *testing.T) {
