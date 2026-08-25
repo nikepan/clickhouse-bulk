@@ -78,6 +78,9 @@ func NewClickhouse(downTimeout int, connectTimeout int, sendTimeout int, tlsServ
 
 	c = new(Clickhouse)
 	c.DownTimeout = downTimeout
+	if c.DownTimeout <= 0 {
+		c.DownTimeout = 60
+	}
 	c.ConnectTimeout = connectTimeout
 	if c.ConnectTimeout <= 0 {
 		c.ConnectTimeout = 10
@@ -122,6 +125,13 @@ func (c *Clickhouse) DumpServers() {
 	}
 	goodServers.Set(float64(good))
 	badServers.Set(float64(bad))
+}
+
+// ServersCount - number of configured servers
+func (c *Clickhouse) ServersCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.Servers)
 }
 
 // GetNextServer - getting next server for request
@@ -243,16 +253,20 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 
 // SendQuery - sends query to server and return result (with server cycle)
 func (c *Clickhouse) SendQuery(r *ClickhouseRequest) (response string, status int, err error) {
-	for {
+	// every server gets at most one try per request: ending the loop must not
+	// depend on down_timeout, a timeout shorter than a full cycle over the
+	// servers would keep putting the same dead ones back into rotation
+	for attempts := c.ServersCount(); attempts > 0; attempts-- {
 		s := c.GetNextServer()
-		if s != nil {
-			response, status, err = s.SendQuery(r)
-			if errors.Is(err, ErrServerIsDown) {
-				log.Printf("ERROR: server down (%+v): %+v\n", status, response)
-				continue
-			}
-			return response, status, err
+		if s == nil {
+			break
 		}
-		return "", http.StatusServiceUnavailable, ErrNoServers
+		response, status, err = s.SendQuery(r)
+		if errors.Is(err, ErrServerIsDown) {
+			log.Printf("ERROR: server down (%+v): %+v\n", status, response)
+			continue
+		}
+		return response, status, err
 	}
+	return "", http.StatusServiceUnavailable, ErrNoServers
 }
