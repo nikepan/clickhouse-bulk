@@ -4,6 +4,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,7 +39,7 @@ func TestClickhouse_GetNextServer(t *testing.T) {
 	assert.NotEqual(t, "", resp)
 	assert.Equal(t, http.StatusBadGateway, status)
 	assert.True(t, errors.Is(err, ErrServerIsDown))
-	assert.Equal(t, true, s.Bad)
+	assert.Equal(t, true, s.IsBad())
 	c.SendQuery(&ClickhouseRequest{})
 }
 
@@ -54,7 +56,7 @@ func TestClickhouse_SendQuery(t *testing.T) {
 	c := NewClickhouse(300, 10, 0, "", false)
 	c.AddServer("", true)
 	c.GetNextServer()
-	c.Servers[0].Bad = true
+	c.Servers[0].SetBad(true)
 	_, status, err := c.SendQuery(&ClickhouseRequest{})
 	assert.Equal(t, 503, status)
 	assert.True(t, errors.Is(err, ErrNoServers))
@@ -64,9 +66,9 @@ func TestClickhouse_SendQuery1(t *testing.T) {
 	c := NewClickhouse(-1, 10, 0, "", false)
 	c.AddServer("", true)
 	c.GetNextServer()
-	c.Servers[0].Bad = true
+	c.Servers[0].SetBad(true)
 	s := c.GetNextServer()
-	assert.Equal(t, false, s.Bad)
+	assert.Equal(t, false, s.IsBad())
 }
 
 func TestClickhouse_ResponseBodyClosed(t *testing.T) {
@@ -108,3 +110,29 @@ type spyBody struct{ onClose func() }
 
 func (b *spyBody) Read(p []byte) (int, error) { copy(p, "OK"); return 2, io.EOF }
 func (b *spyBody) Close() error               { b.onClose(); return nil }
+
+// server is marked down from request goroutines while the queue worker reads
+// the flag for metrics, so the state has to be safe for concurrent access
+func TestClickhouse_BadFlagIsRaceFree(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer s.Close()
+	c := NewClickhouse(300, 10, 10, "", false)
+	c.AddServer(s.URL, false)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			c.SendQuery(&ClickhouseRequest{Content: "test"})
+		}()
+		go func() {
+			defer wg.Done()
+			c.DumpServers()
+		}()
+	}
+	wg.Wait()
+	assert.Equal(t, true, c.Servers[0].IsBad())
+}

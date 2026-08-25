@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nikepan/go-datastructures/queue"
@@ -19,9 +20,20 @@ import (
 type ClickhouseServer struct {
 	URL         string
 	LastRequest time.Time
-	Bad         bool
+	bad         atomic.Bool
 	Client      *http.Client
 	LogQueries  bool
+}
+
+// IsBad - check if server is marked as down. Safe for concurrent use: the
+// flag is set from request goroutines and read by the queue worker.
+func (srv *ClickhouseServer) IsBad() bool {
+	return srv.bad.Load()
+}
+
+// SetBad - mark server as down or alive
+func (srv *ClickhouseServer) SetBad(bad bool) {
+	srv.bad.Store(bad)
 }
 
 // Clickhouse - main clickhouse sender object
@@ -102,7 +114,7 @@ func (c *Clickhouse) DumpServers() {
 	good := 0
 	bad := 0
 	for _, s := range c.Servers {
-		if s.Bad {
+		if s.IsBad() {
 			bad++
 		} else {
 			good++
@@ -118,9 +130,9 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 	defer c.mu.Unlock()
 	tnow := time.Now()
 	for _, s := range c.Servers {
-		if s.Bad {
+		if s.IsBad() {
 			if tnow.Sub(s.LastRequest) > time.Second*time.Duration(c.DownTimeout) {
-				s.Bad = false
+				s.SetBad(false)
 			} else {
 				continue
 			}
@@ -208,7 +220,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		}
 		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
 		if err != nil {
-			srv.Bad = true
+			srv.SetBad(true)
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
 		defer resp.Body.Close()
@@ -218,7 +230,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		buf, _ := io.ReadAll(resp.Body)
 		s := string(buf)
 		if resp.StatusCode >= 502 {
-			srv.Bad = true
+			srv.SetBad(true)
 			err = ErrServerIsDown
 		} else if resp.StatusCode >= 400 {
 			err = fmt.Errorf("Wrong server status %+v:\nresponse: %+v\nrequest: %#v", resp.StatusCode, s, r.Content)
